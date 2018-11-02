@@ -20,11 +20,9 @@ Due to the possible expiration of the JWT auth token, and potential for other is
 ## Unfinished
 
 - Accept a refresh token to refresh the JWT
-- Raise exceptions for JWT and other problems
-- Convert prints to logs, and add some info/warning
 - Export files
 - Add support for DMs
 - Add support for topics
 - Add an optional flag to export annotations
-- Surface a way to export a given space by ID
 - Make the resume tolerant of space name changes
+- Update the members so multiple runs don't leave a lot of members files

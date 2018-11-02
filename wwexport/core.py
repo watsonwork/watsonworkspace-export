@@ -1,24 +1,23 @@
-from . import requests
+import client
 
+import logging
 import os
 import csv
 import datetime
-#import getpass
+import getpass
 from pathlib import Path
 from dateutil.parser import parse
 from collections import namedtuple
 
+logger = logging.getLogger("wwexport")
+
 messages_file_format = "messages {}.csv"
 
-def get_auth_token():
-    return input("Watson Work JWT: ")
-    #return getpass.getpass("Watson Work JWT: ")
-
-def get_all_spaces(auth_token):
+def get_all_spaces(auth_token:str) -> list:
     after = None
     all_spaces = []
     while True:
-        spaces_page = requests.get_spaces(after, auth_token)
+        spaces_page = client.get_spaces(after, auth_token)
         all_spaces.extend(spaces_page["items"])
 
         if (spaces_page["pageInfo"]["hasNextPage"]):
@@ -27,13 +26,13 @@ def get_all_spaces(auth_token):
             break
     return all_spaces
 
-def export_space_members(space_id, filename, auth_token):
+def export_space_members(space_id:str, filename:str, auth_token:str) -> list:
     with open(filename,"w+") as space_members_file:
         space_members_writer = csv.writer(space_members_file)
         space_members = []
         after = None
         while True:
-            space_members_page = requests.get_space_members(space_id, after, auth_token)
+            space_members_page = client.get_space_members(space_id, after, auth_token)
             for member in space_members_page["items"]:
                 space_members_writer.writerow([member["displayName"],member["email"],member["id"]])
 
@@ -43,19 +42,22 @@ def export_space_members(space_id, filename, auth_token):
                 after = space_members_page["pageInfo"]["endCursor"]
             else:
                 break
+        logger.info("Printed %s members", len(space_members))
     return space_members
 
-def write_message(message, writer):
+def write_message(message:str, writer:csv.DictWriter) -> None:
     # if there isn't content, pull it from the annotation if there is one
     if message["content"] is None:
-        if message["typedAnnotations"] is not None:
-            if len(message["typedAnnotations"]) >0:
-                if message["typedAnnotations"][0]["text"] is not None:
-                    message["content"] = message["typedAnnotations"][0]["text"]
+        if message["typedAnnotations"] is not None and len(message["typedAnnotations"]) >0:
+            if message["typedAnnotations"][0]["text"] is not None:
+                logger.debug("Content is empty, but found an annotation with text on message %s", message["id"])
+                message["content"] = message["typedAnnotations"][0]["text"]
+            else:
+                logger.warn("Content is empty and the first annotation didn't have text on message %s", message["id"])
 
     # pull the creator's display name if there is one, otherwise use their id for their "name"
-    creatorName = ""
-    creatorId = ""
+    creatorName = None
+    creatorId = None
     if "createdBy" in message and message["createdBy"] is not None:
         if "displayName" in message["createdBy"]:
             creatorName = message["createdBy"]["displayName"]
@@ -63,16 +65,16 @@ def write_message(message, writer):
             creatorId = message["createdBy"]["id"]
     writer.writerow([message["id"], creatorName, creatorId, message["created"], message["content"]])
 
-def get_messages_path(space_export_root, year, month):
+def get_messages_path(space_export_root:str, year:int, month:int) -> str:
     return space_export_root / str(year) / "messages {}.csv".format(month)
 
-def find_messages_resume_point(space_export_root):
-    ResumePoint = namedtuple('ResumePoint', ['last_time', 'last_id'])
+ResumePoint = namedtuple('ResumePoint', ['last_time', 'last_id'])
+def find_messages_resume_point(space_export_root) -> ResumePoint:
     for year in range(datetime.datetime.now().year, 2014, -1):
         for month in range(12, 1, -1):
             path = get_messages_path(space_export_root, year, month)
             if path.exists():
-                print("Found possible resume point in {}".format(path))
+                logger.debug("Found possible resume point in %s", path)
                 with open(path, "r") as space_messages_file:
                     space_messages_reader = csv.reader(space_messages_file)
                     last_message_time = ""
@@ -82,13 +84,12 @@ def find_messages_resume_point(space_export_root):
                     if last_message_time:
                         try:
                             previous_time_in_milliseconds = int(parse(last_message_time).timestamp() * 1000)
-                            print("Resuming from {} - aka {}".format(last_message_time, previous_time_in_milliseconds))
                             return ResumePoint(previous_time_in_milliseconds, line[0])
                         except ValueError:
                             pass
     return ResumePoint(None, None)
 
-def export_space(space, auth_token, export_members, export_messages, export_root_folder=Path.home() / "Watson Workspace Export"):
+def export_space(space:dict, auth_token:str, export_members:bool, export_messages:bool, export_root_folder:str=Path.home() / "Watson Workspace Export") -> None:
     export_time = datetime.datetime.now()
 
     #if not export_root_folder:
@@ -100,15 +101,16 @@ def export_space(space, auth_token, export_members, export_messages, export_root
     if not space_export_root.exists():
         space_export_root.mkdir(parents=True)
 
-    print("Exporting to {}".format(space_export_root))
+    logger.info(">>Exporting %s with ID %s to %s", space["title"], space["id"], space_export_root)
 
     # write members file
     if export_members:
         export_space_members(space["id"], space_export_root / "members {}.csv".format(export_time.strftime("%Y-%m-%d %H.%M")), auth_token)
 
-    previous_time_in_milliseconds, last_known_id = find_messages_resume_point(space_export_root)
+    next_page_time_in_milliseconds, last_known_id = find_messages_resume_point(space_export_root)
     previous_page_ids = []
     if last_known_id:
+        logger.info("Resuming from message ID %s at %sms", last_known_id, next_page_time_in_milliseconds)
         previous_page_ids.append(last_known_id)
 
     # write message file
@@ -124,31 +126,34 @@ def export_space(space, auth_token, export_members, export_messages, export_root
         # while there are no more pages of messages
         space_messages_file = None
         while export_messages:
-            space_messages_page = requests.get_space_messages(space["id"], previous_time_in_milliseconds, auth_token)
+            space_messages_page = client.get_space_messages(space["id"], next_page_time_in_milliseconds, auth_token)
+            logger.debug("Fetched page with %s items", len(space_messages_page))
             space_messages_page["items"].reverse()
-
-            previous_message_year = ''
-            previous_message_month = ''
-            previous_time_in_milliseconds = ''
 
             page_ids = []
             found_new_message = False
 
             current_messages_path = None
             for message in space_messages_page["items"]:
-                # if this message wasn't in the last page...
+                # If this message wasn't in the last page...
+                # This check is necessary since we paginate by created time of
+                # the message. Without this, we would either need to slightly
+                # increment the time, and risk losing messages, or we would
+                # print the same message twice
                 if message["id"] not in previous_page_ids:
                     message_count += 1
                     found_new_message = True
                     page_ids.append(message["id"])
 
                     created_datetime = parse(message["created"])
-                    previous_time_in_milliseconds = int(created_datetime.timestamp() * 1000)
+                    next_page_time_in_milliseconds = int(created_datetime.timestamp() * 1000)
 
-                    # if necessary, tear down the old file and open a new one for the year and month of the next message
+                    # If necessary, tear down the old file and open a new one
+                    # for the year and month of the next message
                     new_messages_path = get_messages_path(space_export_root, created_datetime.year, created_datetime.month)
                     if (new_messages_path != current_messages_path):
                         if space_messages_file and not space_messages_file.closed:
+                            logger.debug("Closing file while switching files")
                             space_messages_file.flush()
                             space_messages_file.close()
                         if not new_messages_path.parent.exists():
@@ -160,21 +165,27 @@ def export_space(space, auth_token, export_members, export_messages, export_root
 
                         space_messages_writer = csv.writer(space_messages_file)
                         if not resuming_file:
+                            logger.debug("Starting a new file. Writing header.")
                             space_messages_writer.writerow(["message_id", "author name", "author id", "created date", "content"])
 
                     write_message(message, space_messages_writer)
+                else:
+                    logger.debug("Skipping message with ID %s. This may just mean this message was on a prior page. This should normally happen exactly once per page, other than the first page, which it should not occur.", message["id"])
             previous_page_ids = page_ids
             if not found_new_message:
-                # There is potentially a case we could get here in error, if there were more messages with a specific timestamp
-                # than our paging would allow - getting us stuck on the time. We could try to detect this, but it's probably not
-                # going to happen with any space.
+                # There is potentially a case we could get here in error, if
+                # there were more messages with a specific timestamp than our
+                # paging would allow - getting us stuck on the time. We could
+                # try to detect this, but it's probably not going to happen with
+                # any space.
                 if message:
-                    print("Printed {} messages for space {}. The last known message was {} with content {}.".format(message_count, space["id"], message["id"], message["content"]))
+                    logger.info("Printed %s messages for space %s. The last known message was %s.", message_count, space["id"], message["id"])
                 else:
-                    print("Printed {} messages for space {}.".format(message_count, space["id"]))
+                    logger.info("Printed %s messages for space %s.", message_count, space["id"])
                 break
 
     finally:
         if space_messages_file is not None and not space_messages_file.closed:
+            logger.debug("Closing file at end of space export")
             space_messages_file.flush()
             space_messages_file.close()
