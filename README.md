@@ -22,7 +22,6 @@ Run `python wwexport -h` for more options.
 ## Unfinished
 
 - Accept a refresh token to refresh the JWT
-- Export files
 - Add support for DMs
 - Add support for topics
 - Add an optional flag to export annotations
