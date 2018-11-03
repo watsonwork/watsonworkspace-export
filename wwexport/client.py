@@ -32,6 +32,7 @@ class UnknownRequestError(RequestError):
 def download_file (file_id:str, file_title:str, folder:PurePath, auth_token:str) -> int:
     logger.info("Downloading file %s with title %s", file_id, file_title)
     file_url = file_url_format.format(file_id)
+    logger.debug("file url %s", file_url)
 
     logger.debug("waiting for %s seconds", file_download_wait)
     time.sleep(file_download_wait)
@@ -39,6 +40,9 @@ def download_file (file_id:str, file_title:str, folder:PurePath, auth_token:str)
     response = requests.get(file_url, stream=True, headers=get_download_headers(auth_token))
     if response.status_code == 401:
         raise UnauthorizedRequestError()
+    elif response.status_code == 204:
+        content_location = response.headers["x-content-location"]
+        response = requests.get(content_location, stream=True)
     elif response.status_code != 200:
         raise UnknownRequestError(response)
 
@@ -68,7 +72,7 @@ def download_file (file_id:str, file_title:str, folder:PurePath, auth_token:str)
                 found = True
             else:
                 logger.debug("file %s is different %s", temp_file_path, candidate_file_path)
-                candidate_file_path = folder / base_file_path.stem / i / base_file_path.suffixes
+                candidate_file_path = folder / "{} {}{}".format(base_file_path.stem,i,''.join(base_file_path.suffixes)) 
                 i+=1
         if not found:
             temp_file_path.rename(candidate_file_path)
