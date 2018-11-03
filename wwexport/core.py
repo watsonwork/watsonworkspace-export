@@ -4,8 +4,8 @@ import logging
 import os
 import csv
 import datetime
-import getpass
 from pathlib import Path
+from pathlib import PurePath
 from dateutil.parser import parse
 from collections import namedtuple
 
@@ -44,6 +44,21 @@ def export_space_members(space_id:str, filename:str, auth_token:str) -> list:
                 break
         logger.info("Printed %s members", len(space_members))
     return space_members
+
+def export_space_files(space_id:str, folder:PurePath, auth_token:str) -> int:
+    count = 0
+    after = None
+    while True:
+        space_files_page = client.get_space_files(space_id, after, auth_token)
+        for file in space_files_page:
+            client.download_file(file["id"], file["title"], folder, auth_token)
+
+        if (space_files_page["pageInfo"]["hasNextPage"]):
+            after = space_files_page["pageInfo"]["endCursor"]
+        else:
+            break
+    logger.info("Exported %s files", count)
+    return count
 
 def write_message(message:str, writer:csv.DictWriter) -> None:
     # if there isn't content, pull it from the annotation if there is one
@@ -89,23 +104,22 @@ def find_messages_resume_point(space_export_root) -> ResumePoint:
                             pass
     return ResumePoint(None, None)
 
-def export_space(space:dict, auth_token:str, export_members:bool, export_messages:bool, export_root_folder:str=Path.home() / "Watson Workspace Export") -> None:
+def export_space(space:dict, auth_token:str, export_members:bool, export_messages:bool, export_files:bool, export_root_folder:PurePath=Path.home() / "Watson Workspace Export") -> None:
     export_time = datetime.datetime.now()
-
-    #if not export_root_folder:
-    #    export_root_folder = Path.home() / "Watson Workspace Export" # PurePath() / "Watson Workspace Export"
 
     space_folder_name = "{} {}".format(space["title"].replace("/","-"), space["id"])
     space_export_root = export_root_folder / space_folder_name
-
-    if not space_export_root.exists():
-        space_export_root.mkdir(parents=True)
+    space_export_root.mkdir(exist_ok=True, parents=True)
 
     logger.info(">>Exporting %s with ID %s to %s", space["title"], space["id"], space_export_root)
 
-    # write members file
     if export_members:
         export_space_members(space["id"], space_export_root / "members {}.csv".format(export_time.strftime("%Y-%m-%d %H.%M")), auth_token)
+
+    if export_files:
+        files_folder_path = space_export_root / "files"
+        files_folder_path.mkdir(exist_ok=True, parents=True)
+        export_space_files(space["id"], files_folder_path, auth_token)
 
     next_page_time_in_milliseconds, last_known_id = find_messages_resume_point(space_export_root)
     previous_page_ids = []
@@ -128,13 +142,13 @@ def export_space(space:dict, auth_token:str, export_members:bool, export_message
         while export_messages:
             space_messages_page = client.get_space_messages(space["id"], next_page_time_in_milliseconds, auth_token)
             logger.debug("Fetched page with %s items", len(space_messages_page))
-            space_messages_page["items"].reverse()
+            space_messages_page.reverse()
 
             page_ids = []
             found_new_message = False
 
             current_messages_path = None
-            for message in space_messages_page["items"]:
+            for message in space_messages_page:
                 # If this message wasn't in the last page...
                 # This check is necessary since we paginate by created time of
                 # the message. Without this, we would either need to slightly
@@ -156,8 +170,8 @@ def export_space(space:dict, auth_token:str, export_members:bool, export_message
                             logger.debug("Closing file while switching files")
                             space_messages_file.flush()
                             space_messages_file.close()
-                        if not new_messages_path.parent.exists():
-                            new_messages_path.parent.mkdir(parents=True)
+
+                        new_messages_path.parent.mkdir(exist_ok=True, parents=True)
 
                         resuming_file = new_messages_path.exists()
                         space_messages_file = open(new_messages_path, "a")

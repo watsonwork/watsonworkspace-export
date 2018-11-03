@@ -3,6 +3,7 @@ import client
 import sys
 import yaml
 import argparse
+import getpass
 import logging
 import logging.handlers
 
@@ -13,11 +14,18 @@ def get_refresh_token() -> str:
     return getpass.getpass("Watson Work Auth Refresh Token: ")
 
 def main(argv):
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="Export utility for Watson Workspace",
+        epilog="Source at https://github.ibm.com/jbrunn/watsonworkspace_export")
     parser.add_argument("--jwt", help="JWT token for accessing Watson Work. If ommitted, you may enter interactively, but interactive mode may not work in some terminals due to input length limits.")
     parser.add_argument("--spaceid", help="An optional ID of a space to export. If omitted, all spaces will be exported.")
-    parser.add_argument("--consolelevel", help="One of DEBUG, INFO, WARN, ERROR to use for the console. By default, INFO will be used.")
-    parser.add_argument("--logfile", help="An optional log file to be used as a rotating log, to which all log messages (DEBUG) will be printed")
+    parser.add_argument("-f", "--files", action="store_true", help="export files")
+
+    logging_group = parser.add_argument_group("Logging")
+    logging_group.add_argument("--consolelevel", default="INFO", help="DEBUG, INFO, WARN, or ERROR")
+    logging_group.add_argument("--logfile", help="log all (DEBUG, INFO, WARN, ERROR) messages to this file")
+
     args = parser.parse_args()
 
     logger = logging.getLogger("wwexport")
@@ -47,15 +55,15 @@ def main(argv):
     try:
         if args.spaceid:
             space = client.get_space(args.spaceid, auth_token)
-            core.export_space(space, auth_token, True, True)
+            core.export_space(space, auth_token, True, True, args.files)
         else:
             spaces = core.get_all_spaces(auth_token)
             for space in spaces:
-                core.export_space(space, auth_token, True, True)
+                core.export_space(space, auth_token, True, True, args.files)
     except client.UnauthorizedRequestError:
         logger.error("Export incomplete. Looks like your JWT might have timed out. Good thing this is resumable. Go get a new one and run this again. We'll pick up from where we left off (more or less).")
     except client.UnknownRequestError as err:
-        logger.error("Export incomplete. Aborting with HTTP error code {} with response {}", err.status_code, err.text)
+        logger.error("Export incomplete. Aborting with HTTP status code %s with response %s", err.status_code, err.text)
     else:
         logger.info("Completed export")
 
