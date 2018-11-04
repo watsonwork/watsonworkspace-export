@@ -34,7 +34,7 @@ class GraphQLError(RequestError):
     def __init__(self, errors:list):
         self.errors = errors
 
-def download_file (file_id:str, file_title:str, folder:PurePath, auth_token:str) -> int:
+def download_file (file_id:str, file_title:str, folder:PurePath, auth_token:str):
     logger.info("Downloading file %s with title %s", file_id, file_title)
     file_url = file_url_format.format(file_id)
     logger.debug("file url %s", file_url)
@@ -52,6 +52,7 @@ def download_file (file_id:str, file_title:str, folder:PurePath, auth_token:str)
         raise UnknownRequestError(response)
 
     bytes_written = 0
+    new_file = False
 
     temp_file_path = folder / file_id
 
@@ -77,17 +78,18 @@ def download_file (file_id:str, file_title:str, folder:PurePath, auth_token:str)
                 temp_file_path.unlink()
                 found = True
             else:
-                logger.debug("file %s is different %s", temp_file_path, candidate_file_path)
+                logger.debug("file %s is different from %s", temp_file_path, candidate_file_path)
                 candidate_file_path = folder / "{} {}{}".format(base_file_path.stem,i,''.join(base_file_path.suffixes))
                 i+=1
         if not found:
+            new_file = True
             temp_file_path.rename(candidate_file_path)
             logger.debug("file %s with id %s saved as %s", file_title, file_id, candidate_file_path)
     finally:
         if temp_file_path.exists():
             temp_file_path.unlink()
 
-    return bytes_written
+    return candidate_file_path, new_file
 
 def get_download_headers(auth_token: str) -> dict:
     return {'jwt': auth_token}
@@ -216,6 +218,15 @@ def get_space_files (space_id:str, fetch_before_timestamp:str, auth_token:str) -
         id
         title
         created
+        createdBy {
+          id
+          displayName
+          email
+        }
+        contentType
+        message {
+          id
+        }
       }
     }
   }

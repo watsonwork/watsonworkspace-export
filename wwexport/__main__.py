@@ -23,7 +23,7 @@ def main(argv):
 
     file_group = parser.add_argument_group("Files")
     file_group.add_argument("--files", action="store_true", help="Export files. Unless --allfiles is also specified, the tool will only download files since latest downloaded message of the space. If no messages were previously downloaded for the space, the --files and --allfiles are equivalent.")
-    file_group.add_argument("--allfiles", action="store_true", help="Restart file downloads from the beginning of time. If you previously ran the tool to download messages, but not files, then you may want to use this option.")
+    file_group.add_argument("--allfiles", action="store_true", help="Restart file downloads from the beginning of time. If you previously ran the tool to download messages, but not files, then you may want to use this option. This option will still detect duplicate files within a space and delete them after they are downloaded.")
 
     logging_group = parser.add_argument_group("Logging")
     logging_group.add_argument("--consolelevel", default="INFO", help="DEBUG, INFO, WARN, or ERROR")

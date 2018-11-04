@@ -4,6 +4,7 @@ import logging
 import os
 import csv
 import datetime
+import json
 from pathlib import Path
 from pathlib import PurePath
 from dateutil.parser import parse
@@ -13,6 +14,14 @@ from enum import Enum
 logger = logging.getLogger("wwexport")
 
 messages_file_format = "messages {}.csv"
+file_entries_file_name = "_entries.json"
+file_paths_file_name = "_paths.json"
+
+class Options(Enum):
+    MEMBERS = 1
+    MESSAGES = 2
+    FILES = 3
+    ALLFILES = 4
 
 def get_all_spaces(auth_token:str) -> list:
     after = None
@@ -47,7 +56,7 @@ def export_space_members(space_id:str, filename:str, auth_token:str) -> list:
         logger.info("Printed %s members to %s", len(space_members), filename)
     return space_members
 
-def export_space_files(space_id:str, folder:PurePath, auth_token:str, fetch_after_timestamp: int) -> int:
+def export_space_files(space_id:str, folder:PurePath, auth_token:str, fetch_after_timestamp: int=0) -> int:
     """Export spaces, starting with the newest and going back only to the
     fetch_after_timestamp. This order is implemented since paging from oldest
     to newest doesn't seem to be implemented for the beta resource API.
@@ -59,47 +68,77 @@ def export_space_files(space_id:str, folder:PurePath, auth_token:str, fetch_afte
     and myfile 1.txt will be older. This may already be counter-intuitive, but
     additionally, if the task was already run and an earlier file was downloaded
     as myfile.txt, it's possible the newer file will be named myfile 1.txt"""
-    count = 0
 
-    previous_page_ids = set()
-    next_page_time_in_milliseconds = None
+    file_graphqlitem_by_id = {}
+    if (folder / file_entries_file_name).exists():
+        with open(folder / file_entries_file_name, "r") as f:
+            file_graphqlitem_by_id = json.load(f)
+    file_path_by_id = {}
+    if (folder / file_paths_file_name).exists():
+        with open(folder / file_paths_file_name, "r") as f:
+            file_path_by_id = json.load(f)
 
-    while True:
-        space_files_page = client.get_space_files(space_id, next_page_time_in_milliseconds, auth_token)
-        if space_files_page:
-            logger.debug("Fetched page with %s files for space %s", len(space_files_page), space_id)
-        elif len(previous_page_ids) == 0:
-            logger.debug("No files found for space %s", space_id)
-            break
-        else:
-            logger.error("Fetched page with no files for space %s, but expected this page to contain at least one file.")
-            break
+    downloaded = 0
+    already_downloaded = 0
+    duplicates = 0
 
-        found_file = False
-        page_ids = set()
-        for file in space_files_page:
-            file_created_ms = int(parse(file["created"]).timestamp() * 1000)
-            if file_created_ms >= fetch_after_timestamp:
-                if file["id"] in previous_page_ids:
-                    logger.debug("skipping file with id %s since it was in the last page", file["id"])
-                else:
-                    found_file = True
-                    page_ids.add(file["id"])
-                    if next_page_time_in_milliseconds:
-                        next_page_time_in_milliseconds = min(next_page_time_in_milliseconds, file_created_ms)
-                    else:
-                        next_page_time_in_milliseconds = file_created_ms
-                    client.download_file(file["id"], file["title"], folder, auth_token)
-                    count += 1
+    try:
+        previous_page_ids = set()
+        next_page_time_in_milliseconds = None
+
+        while True:
+            space_files_page = client.get_space_files(space_id, next_page_time_in_milliseconds, auth_token)
+            if space_files_page:
+                logger.debug("Fetched page with %s files for space %s", len(space_files_page), space_id)
+            elif len(previous_page_ids) == 0:
+                logger.debug("No files found for space %s", space_id)
+                break
             else:
-                logger.debug("ignoring file %s since it is before the requested resume point %s", file["id"], fetch_after_timestamp)
+                logger.error("Fetched page with no files for space %s, but expected this page to contain at least one file.")
+                break
 
-        previous_page_ids = page_ids
-        if not found_file:
-            break
+            found_file = False
+            page_ids = set()
+            for file in space_files_page:
+                file_created_ms = int(parse(file["created"]).timestamp() * 1000)
+                if file_created_ms >= fetch_after_timestamp:
+                    file_graphqlitem_by_id[file["id"]] = file
+                    if file["id"] in previous_page_ids:
+                        logger.debug("skipping file with id %s since it was in the last page", file["id"])
+                    else:
+                        found_file = True
+                        page_ids.add(file["id"])
+                        if next_page_time_in_milliseconds:
+                            next_page_time_in_milliseconds = min(next_page_time_in_milliseconds, file_created_ms)
+                        else:
+                            next_page_time_in_milliseconds = file_created_ms
+                        if file["id"] in file_path_by_id and Path(file_path_by_id[file["id"]]).exists():
+                            logger.debug("file %s is already downloaded to %s, skipping download", file["id"], file_path_by_id[file["id"]])
+                            already_downloaded += 1
+                        else:
+                            file_path, new_file = client.download_file(file["id"], file["title"], folder, auth_token)
+                            file_path_by_id[file["id"]] = str(file_path)
+                            if new_file:
+                                downloaded += 1
+                            else:
+                                duplicates += 1
+                else:
+                    logger.debug("ignoring file %s since it is before the requested resume point %s", file["id"], fetch_after_timestamp)
 
-    logger.info("Exported %s files", count)
-    return count
+            previous_page_ids = page_ids
+            if not found_file:
+                break
+
+    finally:
+        if len(file_graphqlitem_by_id) > 0:
+            with open(folder / file_entries_file_name, "w") as entries_file:
+                json.dump(file_graphqlitem_by_id, entries_file)
+        if len(file_path_by_id) > 0:
+            with open(folder / file_paths_file_name, "w") as entries_file:
+                json.dump(file_path_by_id, entries_file)
+
+    logger.info("Downloaded %s files, %s files were skipped because they were downloaded according to meta files, %s files were duplicates of files already downloaded", downloaded, already_downloaded, duplicates)
+    return downloaded
 
 def write_message(message:str, writer:csv.DictWriter) -> None:
     # if there isn't content, pull it from the annotation if there is one
