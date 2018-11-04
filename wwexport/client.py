@@ -29,12 +29,17 @@ class UnknownRequestError(RequestError):
         self.status_code = response.status_code
         self.text = response.text
 
+class GraphQLError(RequestError):
+    """An error was detected inside the GraphQL response"""
+    def __init__(self, errors:list):
+        self.errors = errors
+
 def download_file (file_id:str, file_title:str, folder:PurePath, auth_token:str) -> int:
     logger.info("Downloading file %s with title %s", file_id, file_title)
     file_url = file_url_format.format(file_id)
     logger.debug("file url %s", file_url)
 
-    logger.debug("waiting for %s seconds", file_download_wait)
+    logger.log(5, "waiting for %s seconds", file_download_wait)
     time.sleep(file_download_wait)
 
     response = requests.get(file_url, stream=True, headers=get_download_headers(auth_token))
@@ -57,6 +62,7 @@ def download_file (file_id:str, file_title:str, folder:PurePath, auth_token:str)
                 if chunk:
                     local_file.write(chunk)
                     bytes_written += len(chunk)
+        logger.debug("wrote %s bytes", bytes_written)
 
         base_file_path = folder / file_title
         candidate_file_path = base_file_path
@@ -72,16 +78,15 @@ def download_file (file_id:str, file_title:str, folder:PurePath, auth_token:str)
                 found = True
             else:
                 logger.debug("file %s is different %s", temp_file_path, candidate_file_path)
-                candidate_file_path = folder / "{} {}{}".format(base_file_path.stem,i,''.join(base_file_path.suffixes)) 
+                candidate_file_path = folder / "{} {}{}".format(base_file_path.stem,i,''.join(base_file_path.suffixes))
                 i+=1
         if not found:
             temp_file_path.rename(candidate_file_path)
-            logger.debug("file %s saved as %s", temp_file_path, candidate_file_path)
+            logger.debug("file %s with id %s saved as %s", file_title, file_id, candidate_file_path)
     finally:
         if temp_file_path.exists():
             temp_file_path.unlink()
 
-    logger.debug("wrote %s bytes", bytes_written)
     return bytes_written
 
 def get_download_headers(auth_token: str) -> dict:
@@ -95,7 +100,7 @@ def graphql_request(auth_token: str, request: str, params: str = None) -> reques
         logger.debug("elapsed time since last graphql request %s", elapsed)
         if elapsed < min_graphql_interval:
             wait = (min_graphql_interval-elapsed).total_seconds()
-            logger.debug("waiting for %s seconds", wait)
+            logger.log(5, "waiting for %s seconds", wait)
             time.sleep(wait)
 
     last_graphql_request = now
@@ -108,13 +113,19 @@ def graphql_request(auth_token: str, request: str, params: str = None) -> reques
         raise UnauthorizedRequestError()
     elif response.status_code != 200:
         raise UnknownRequestError(response)
+
     return response
 
 def get_graphql_headers(auth_token: str) -> dict:
     return {'jwt': auth_token, 'Content-Type': 'application/graphql', 'x-graphql-view': 'RESOURCE,TYPED_ANNOTATIONS,EXPERIMENTAL,PUBLIC'}
 
-def handle_json_response(response:requests.Response, referenceToGet:list) -> dict:
+def handle_json_response(response:requests.Response, referenceToGet:list):
     next_level = response.json()
+    logger.log(5, "response JSON\n%s", next_level)
+
+    if "errors" in next_level:
+        raise GraphQLError(next_level["errors"])
+
     for next_label in referenceToGet:
         if (next_level[next_label]):
             next_level = next_level[next_label]
@@ -191,12 +202,16 @@ def get_space_members (space_id:str, after:str, auth_token:str) -> list:
     space_members = handle_json_response(response, ("data","space","members"))
     return space_members
 
-def get_space_files (space_id:str, oldest_timestamp:str, auth_token:str) -> list:
-    logger.info("Getting files for space %s starting at %s", space_id, oldest_timestamp)
+def get_space_files (space_id:str, fetch_before_timestamp:str, auth_token:str) -> list:
+    """Get space files for the given space id. We use backward paging here since
+    the order we fetch isn't important when saving as files, and the api
+    doesn't seem to work well with oldestTimestamp and last parameters. It seems
+    that oldestTimestamp gets ignored."""
+    logger.info("Getting files for space %s before %s", space_id, fetch_before_timestamp)
 
-    request = """query getFiles($spaceId: ID!, $oldestTimestamp: Long) {
+    request = """query getFiles($spaceId: ID!, $beforeTimestamp: Long) {
   space(id: $spaceId) {
-    resources(last: 200, oldestTimestamp: $oldestTimestamp) {
+    resources(first: 200, mostRecentTimestamp: $beforeTimestamp) {
       items {
         id
         title
@@ -204,10 +219,9 @@ def get_space_files (space_id:str, oldest_timestamp:str, auth_token:str) -> list
       }
     }
   }
-}
-"""
-    if (oldest_timestamp):
-        params = {"variables":'''{{"oldestTimestamp": "{:d}","spaceId": "{}"}}'''.format(oldest_timestamp, space_id)}
+}"""
+    if (fetch_before_timestamp):
+        params = {"variables":'''{{"beforeTimestamp": "{:d}","spaceId": "{}"}}'''.format(fetch_before_timestamp, space_id)}
     else:
         params = {"variables":'''{{"spaceId": "{0}"}}'''.format(space_id)}
 

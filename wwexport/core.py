@@ -8,6 +8,7 @@ from pathlib import Path
 from pathlib import PurePath
 from dateutil.parser import parse
 from collections import namedtuple
+from enum import Enum
 
 logger = logging.getLogger("wwexport")
 
@@ -31,6 +32,7 @@ def export_space_members(space_id:str, filename:str, auth_token:str) -> list:
         space_members_writer = csv.writer(space_members_file)
         space_members = []
         after = None
+        space_members_writer.writerow(["name","email","id"])
         while True:
             space_members_page = client.get_space_members(space_id, after, auth_token)
             for member in space_members_page["items"]:
@@ -42,21 +44,60 @@ def export_space_members(space_id:str, filename:str, auth_token:str) -> list:
                 after = space_members_page["pageInfo"]["endCursor"]
             else:
                 break
-        logger.info("Printed %s members", len(space_members))
+        logger.info("Printed %s members to %s", len(space_members), filename)
     return space_members
 
-def export_space_files(space_id:str, folder:PurePath, auth_token:str) -> int:
+def export_space_files(space_id:str, folder:PurePath, auth_token:str, fetch_after_timestamp: int) -> int:
+    """Export spaces, starting with the newest and going back only to the
+    fetch_after_timestamp. This order is implemented since paging from oldest
+    to newest doesn't seem to be implemented for the beta resource API.
+    The downside to this approach is that if file name collisions occurs,
+    the names will be non-deterministic and depend on when the files are created
+    relative to prior executions of this method. For instance, myfile.txt and
+    myfile 1.txt will refer to two files with title myfile.txt. Because we
+    start from newest to oldest, myfile.txt will normally be the newest file,
+    and myfile 1.txt will be older. This may already be counter-intuitive, but
+    additionally, if the task was already run and an earlier file was downloaded
+    as myfile.txt, it's possible the newer file will be named myfile 1.txt"""
     count = 0
-    after = None
-    while True:
-        space_files_page = client.get_space_files(space_id, after, auth_token)
-        for file in space_files_page:
-            client.download_file(file["id"], file["title"], folder, auth_token)
 
-        if (space_files_page["pageInfo"]["hasNextPage"]):
-            after = space_files_page["pageInfo"]["endCursor"]
-        else:
+    previous_page_ids = set()
+    next_page_time_in_milliseconds = None
+
+    while True:
+        space_files_page = client.get_space_files(space_id, next_page_time_in_milliseconds, auth_token)
+        if space_files_page:
+            logger.debug("Fetched page with %s files for space %s", len(space_files_page), space_id)
+        elif len(previous_page_ids) == 0:
+            logger.debug("No files found for space %s", space_id)
             break
+        else:
+            logger.error("Fetched page with no files for space %s, but expected this page to contain at least one file.")
+            break
+
+        found_file = False
+        page_ids = set()
+        for file in space_files_page:
+            file_created_ms = int(parse(file["created"]).timestamp() * 1000)
+            if file_created_ms >= fetch_after_timestamp:
+                if file["id"] in previous_page_ids:
+                    logger.debug("skipping file with id %s since it was in the last page", file["id"])
+                else:
+                    found_file = True
+                    page_ids.add(file["id"])
+                    if next_page_time_in_milliseconds:
+                        next_page_time_in_milliseconds = min(next_page_time_in_milliseconds, file_created_ms)
+                    else:
+                        next_page_time_in_milliseconds = file_created_ms
+                    client.download_file(file["id"], file["title"], folder, auth_token)
+                    count += 1
+            else:
+                logger.debug("ignoring file %s since it is before the requested resume point %s", file["id"], fetch_after_timestamp)
+
+        previous_page_ids = page_ids
+        if not found_file:
+            break
+
     logger.info("Exported %s files", count)
     return count
 
@@ -92,19 +133,21 @@ def find_messages_resume_point(space_export_root) -> ResumePoint:
                 logger.debug("Found possible resume point in %s", path)
                 with open(path, "r") as space_messages_file:
                     space_messages_reader = csv.reader(space_messages_file)
-                    last_message_time = ""
+                    last_message_time = None
                     for line in space_messages_reader:
                         if len(line) >= 4:
                             last_message_time = line[3]
+                        else:
+                            log.warn("found a line shorter than expected in %s when looking for resume point", path)
                     if last_message_time:
                         try:
                             previous_time_in_milliseconds = int(parse(last_message_time).timestamp() * 1000)
                             return ResumePoint(previous_time_in_milliseconds, line[0])
                         except ValueError:
                             pass
-    return ResumePoint(None, None)
+    return ResumePoint(0, None)
 
-def export_space(space:dict, auth_token:str, export_members:bool, export_messages:bool, export_files:bool, export_root_folder:PurePath=Path.home() / "Watson Workspace Export") -> None:
+def export_space(space:dict, auth_token:str, export_members:bool, export_messages:bool, export_files:bool, restart_files:bool, export_root_folder:PurePath=Path.home() / "Watson Workspace Export") -> None:
     export_time = datetime.datetime.now()
 
     space_folder_name = "{} {}".format(space["title"].replace("/","-"), space["id"])
@@ -113,19 +156,25 @@ def export_space(space:dict, auth_token:str, export_members:bool, export_message
 
     logger.info(">>Exporting %s with ID %s to %s", space["title"], space["id"], space_export_root)
 
+    if not space["title"]:
+        logger.warn("space with id %s at %s lacks a title - this could be a DM space", space["id"], space_folder_name)
+
     if export_members:
         export_space_members(space["id"], space_export_root / "members {}.csv".format(export_time.strftime("%Y-%m-%d %H.%M")), auth_token)
+
+    next_page_time_in_milliseconds, last_known_id = find_messages_resume_point(space_export_root)
+    previous_page_ids = set()
+    if last_known_id:
+        logger.info("Resuming from message ID %s at %sms", last_known_id, next_page_time_in_milliseconds)
+        previous_page_ids.add(last_known_id)
 
     if export_files:
         files_folder_path = space_export_root / "files"
         files_folder_path.mkdir(exist_ok=True, parents=True)
-        export_space_files(space["id"], files_folder_path, auth_token)
-
-    next_page_time_in_milliseconds, last_known_id = find_messages_resume_point(space_export_root)
-    previous_page_ids = []
-    if last_known_id:
-        logger.info("Resuming from message ID %s at %sms", last_known_id, next_page_time_in_milliseconds)
-        previous_page_ids.append(last_known_id)
+        if restart_files:
+            export_space_files(space["id"], files_folder_path, auth_token)
+        else:
+            export_space_files(space["id"], files_folder_path, auth_token, next_page_time_in_milliseconds)
 
     # write message file
     # iterate over pages of messages for the space. We reverse them since they are in reverse chronological order
@@ -141,10 +190,20 @@ def export_space(space:dict, auth_token:str, export_members:bool, export_message
         space_messages_file = None
         while export_messages:
             space_messages_page = client.get_space_messages(space["id"], next_page_time_in_milliseconds, auth_token)
-            logger.debug("Fetched page with %s items", len(space_messages_page))
+            if not space_messages_page:
+                if message_count == 0:
+                    if last_known_id:
+                        logger.warn("Fetched a page with no messages for space %s, but expected at least message %s. This may be OK if the space has no new messages and this message was deleted", space["id"], last_known_id)
+                    else:
+                        logger.info("Fetched empty page of messages and was not resuming. Looks like space %s has no messages", space["id"])
+                else:
+                    logger.error("Fetched a page with no messages, but had printed previous pages. Expected at least one message on this page")
+                break;
+
+            logger.debug("Fetched page with %s messages", len(space_messages_page))
             space_messages_page.reverse()
 
-            page_ids = []
+            page_ids = set()
             found_new_message = False
 
             current_messages_path = None
@@ -153,11 +212,15 @@ def export_space(space:dict, auth_token:str, export_members:bool, export_message
                 # This check is necessary since we paginate by created time of
                 # the message. Without this, we would either need to slightly
                 # increment the time, and risk losing messages, or we would
-                # print the same message twice
+                # print the same message twice. Why not compare just the last
+                # ID? If there is more than 1 message at this time, then there
+                # could be multiple messages overlapping. In the extreme case,
+                # an entire page overlaps and the script exits thinking it
+                # didn't find new messages, but this is extremely unlikely
                 if message["id"] not in previous_page_ids:
                     message_count += 1
                     found_new_message = True
-                    page_ids.append(message["id"])
+                    page_ids.add(message["id"])
 
                     created_datetime = parse(message["created"])
                     next_page_time_in_milliseconds = int(created_datetime.timestamp() * 1000)
@@ -180,7 +243,7 @@ def export_space(space:dict, auth_token:str, export_members:bool, export_message
                         space_messages_writer = csv.writer(space_messages_file)
                         if not resuming_file:
                             logger.debug("Starting a new file. Writing header.")
-                            space_messages_writer.writerow(["message_id", "author name", "author id", "created date", "content"])
+                            space_messages_writer.writerow(["message id", "author name", "author id", "created date", "content"])
 
                     write_message(message, space_messages_writer)
                 else:
