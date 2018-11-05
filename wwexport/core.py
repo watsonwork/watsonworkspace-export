@@ -14,8 +14,9 @@ from enum import Enum
 logger = logging.getLogger("wwexport")
 
 messages_file_format = "messages {}.csv"
-file_entries_file_suffix = "_meta/entries.json"
-file_paths_file_suffix = "_meta/paths.json"
+files_meta_folder = "_meta"
+file_entries_file_name = "entries.json"
+file_paths_file_name = "paths.json"
 
 class Options(Enum):
     MEMBERS = 1
@@ -70,12 +71,14 @@ def export_space_files(space_id:str, folder:PurePath, auth_token:str, fetch_afte
     as myfile.txt, it's possible the newer file will be named myfile 1.txt"""
 
     file_graphqlitem_by_id = {}
-    if (folder / file_entries_file_suffix).exists():
-        with open(folder / file_entries_file_suffix, "r") as f:
+    file_entries_file_path = folder / files_meta_folder / file_entries_file_name
+    if (file_entries_file_path).exists():
+        with open(file_entries_file_path, "r") as f:
             file_graphqlitem_by_id = json.load(f)
     file_path_by_id = {}
-    if (folder / file_paths_file_suffix).exists():
-        with open(folder / file_paths_file_suffix, "r") as f:
+    file_paths_file_path = folder / files_meta_folder / file_paths_file_name
+    if (file_paths_file_path).exists():
+        with open(file_paths_file_path, "r") as f:
             file_path_by_id = json.load(f)
 
     downloaded = 0
@@ -131,10 +134,12 @@ def export_space_files(space_id:str, folder:PurePath, auth_token:str, fetch_afte
 
     finally:
         if len(file_graphqlitem_by_id) > 0:
-            with open(folder / file_entries_file_suffix, "w") as f:
+            file_entries_file_path.parent.mkdir(exist_ok=True, parents=True)
+            with open(file_entries_file_path, "w+") as f:
                 json.dump(file_graphqlitem_by_id, f)
         if len(file_path_by_id) > 0:
-            with open(folder / file_paths_file_suffix, "w") as f:
+            file_paths_file_path.parent.mkdir(exist_ok=True, parents=True)
+            with open(file_paths_file_path, "w+") as f:
                 json.dump(file_path_by_id, f)
 
     logger.info("Downloaded %s files, %s files were skipped because they were downloaded according to meta files, %s files were duplicates of files already downloaded", downloaded, already_downloaded, duplicates)
