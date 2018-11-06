@@ -7,12 +7,6 @@ import getpass
 import logging
 import logging.handlers
 
-def get_auth_token() -> str:
-    return getpass.getpass("Watson Work Auth Token (JWT): ")
-
-def get_refresh_token() -> str:
-    return getpass.getpass("Watson Work Auth Refresh Token: ")
-
 def main(argv):
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -27,7 +21,7 @@ def main(argv):
 
     logging_group = parser.add_argument_group("Logging")
     logging_group.add_argument("--consolelevel", default="INFO", help="DEBUG, INFO, WARN, or ERROR")
-    logging_group.add_argument("--logfile", help="log all (DEBUG, INFO, WARN, ERROR) messages to this file")
+    logging_group.add_argument("--logfile", help="log messages of --filelevel to this file, defaults to DEBUG")
     logging_group.add_argument("--filelevel", default="DEBUG", help="DEBUG, INFO, WARN, or ERROR")
 
     args = parser.parse_args()
@@ -35,21 +29,21 @@ def main(argv):
     logger = logging.getLogger("wwexport")
     logging.addLevelName(5, "FINEST")
 
+    default_formatter = logging.Formatter("%(asctime)s %(name)s %(levelname)-8s: %(message)s")
+
+    error_log_handler = logging.handlers.RotatingFileHandler("errors.log", maxBytes=1048576, backupCount=10)
+    error_log_handler.setFormatter(default_formatter)
+    error_log_handler.setLevel(logging.WARN)
+    logger.addHandler(error_log_handler)
+
     if args.logfile:
         file_log_handler = logging.handlers.RotatingFileHandler(args.logfile, maxBytes=1048576, backupCount=10)
-        debug_formatter = logging.Formatter("%(asctime)s %(name)s %(levelname)-8s: %(message)s")
-        file_log_handler.setFormatter(debug_formatter)
-        logger.addHandler(file_log_handler)
-        #if args.filelevel:
+        file_log_handler.setFormatter(default_formatter)
         file_log_handler.setLevel(args.filelevel)
-        #else:
-        #    file_log_handler.setLevel(logging.DEBUG)
+        logger.addHandler(file_log_handler)
 
     console_log_handler = logging.StreamHandler(stream=sys.stderr)
-    #if args.consolelevel:
     console_log_handler.setLevel(args.consolelevel)
-    #else:
-    #    console_log_handler.setLevel(logging.INFO)
     logger.addHandler(console_log_handler)
 
     logger.setLevel(5)
@@ -57,7 +51,7 @@ def main(argv):
     auth_token = args.jwt
 
     if not auth_token:
-        auth_token = get_auth_token()
+        auth_token = getpass.getpass("Watson Work Auth Token (JWT): ")
 
     logger.info("Starting export")
 
@@ -72,9 +66,9 @@ def main(argv):
     except client.UnauthorizedRequestError:
         logger.error("Export incomplete. Looks like your JWT might have timed out. Good thing this is resumable. Go get a new one and run this again. We'll pick up from where we left off (more or less).")
     except client.UnknownRequestError as err:
-        logger.error("Export incomplete. Aborting with HTTP status code %s with response %s", err.status_code, err.text)
+        logger.exception("Export incomplete. Aborting with HTTP status code %s with response %s", err.status_code, err.text)
     except client.GraphQLError as err:
-        logger.error("Export incomplete. Terminating with GraphQLError. If problem persists, run with a log file enabled and check the prior request. You may also run the export space by space to avoid problematic content.")
+        logger.exception("Export incomplete. Terminating with GraphQLError. If problem persists, run with a log file enabled and check the prior request. You may also run the export space by space to avoid problematic content.")
     else:
         logger.info("Completed export")
 

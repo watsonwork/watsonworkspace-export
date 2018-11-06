@@ -126,7 +126,15 @@ def handle_json_response(response:requests.Response, referenceToGet:list):
     logger.log(5, "response JSON\n%s", next_level)
 
     if "errors" in next_level:
-        raise GraphQLError(next_level["errors"])
+        # we will continue on 403 errors, and just log them, but we'll stop
+        # on all other GraphQL errors.
+        error_codes = set([error["message"].strip() for error in next_level["errors"]])
+        if "403" in error_codes:
+            error_codes.remove("403")
+        if len(error_codes) > 0:
+            raise GraphQLError(next_level["errors"])
+        else:
+            logger.error("encountered permission denied (403) while fetching data %s", next_level)
 
     for next_label in referenceToGet:
         if (next_level[next_label]):
