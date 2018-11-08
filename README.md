@@ -24,7 +24,6 @@ When files are exported, additional metadata files are created to save informati
 ## Unfinished
 
 - Accept a refresh token to refresh the JWT
-- Add support for DMs
 - Add support for topics
 - Add an optional flag to export annotations
 - Make the resume tolerant of space name changes

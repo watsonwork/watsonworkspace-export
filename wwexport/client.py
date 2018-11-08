@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import requests
-import json
 import logging
 import datetime
 import time
@@ -21,6 +20,7 @@ import filecmp
 from pathlib import PurePath
 
 graphql_url = "https://api.watsonwork.ibm.com/graphql"
+graphql_views = "DIRECT_MESSAGING,RESOURCE,TYPED_ANNOTATIONS,EXPERIMENTAL,PUBLIC"
 file_url_format = "https://api.watsonwork.ibm.com/files/api/v1/files/file/{}/content/noredirect"
 logger = logging.getLogger("wwexport")
 last_graphql_request = None
@@ -28,6 +28,8 @@ user_cache = {}
 
 min_graphql_interval = datetime.timedelta(seconds=2)
 file_download_wait = 2  # seconds
+
+current_user = None
 
 
 class RequestError(Exception):
@@ -53,6 +55,19 @@ class GraphQLError(RequestError):
 
     def __init__(self, errors: list):
         self.errors = errors
+
+
+def get_current_user(auth_token) -> dict:
+    global current_user
+    if current_user:
+        return current_user
+    else:
+        logger.info("Fetching current user")
+        request = "query getMe{me{id,displayName,email}}"
+        response = graphql_request(
+            request=request, auth_token=auth_token)
+        current_user = handle_json_response(response, ("data", "me"))
+        return current_user
 
 
 def download_file(file_id: str, file_title: str, folder: PurePath, auth_token: str):
@@ -150,10 +165,10 @@ def graphql_request(auth_token: str, request: str, params: str = None) -> reques
 
 
 def get_graphql_headers(auth_token: str) -> dict:
-    return {'jwt': auth_token, 'Content-Type': 'application/graphql', 'x-graphql-view': 'RESOURCE,TYPED_ANNOTATIONS,EXPERIMENTAL,PUBLIC'}
+    return {'jwt': auth_token, 'Content-Type': 'application/graphql', 'x-graphql-view': graphql_views}
 
 
-def handle_json_response(response: requests.Response, referenceToGet: list):
+def handle_json_response(response: requests.Response, reference_to_get: list):
     next_level = response.json()
     logger.log(5, "response JSON\n%s", next_level)
 
@@ -170,7 +185,7 @@ def handle_json_response(response: requests.Response, referenceToGet: list):
             logger.error(
                 "encountered permission denied (403) while fetching data %s", next_level)
 
-    for next_label in referenceToGet:
+    for next_label in reference_to_get:
         if (next_level[next_label]):
             next_level = next_level[next_label]
         else:
@@ -178,16 +193,18 @@ def handle_json_response(response: requests.Response, referenceToGet: list):
     return next_level
 
 
-def get_user(user_id: str, auth_token: str) -> dict:
-    logger.info("Getting user %s", user_id)
-    if (user_id in user_cache):
-        return user_cache[user_id]
-    request = '''{{person(id:"{0}"){{email,displayName}}}}'''.format(user_id)
+def get_all(page_function, auth_token: str):
+    after = None
+    all = []
+    while True:
+        page = page_function(after, auth_token)
+        all.extend(page["items"])
 
-    response = graphql_request(request=request, auth_token=auth_token)
-    user = handle_json_response(response, ("data", "person"))
-    user_cache[user_id] = user
-    return user
+        if (page["pageInfo"]["hasNextPage"]):
+            after = page["pageInfo"]["endCursor"]
+        else:
+            break
+    return all
 
 
 def get_space(space_id: str, auth_token: str) -> dict:
@@ -196,6 +213,7 @@ def get_space(space_id: str, auth_token: str) -> dict:
   space(id: $spaceId) {
     title
     id
+    type
   }
 }"""
     params = {'variables': '''{{"spaceId": "{0}"}}'''.format(space_id)}
@@ -204,7 +222,37 @@ def get_space(space_id: str, auth_token: str) -> dict:
     return handle_json_response(response, ("data", "space"))
 
 
-def get_spaces(after: str, auth_token: str) -> list:
+def get_dm_spaces_page(after: str, auth_token: str) -> list:
+    logger.info("Getting spaces starting after %s", after)
+    request = """query getDMSpaces($after: String) {
+  directMessagingSpaces(first: 200, after: $after) {
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+    items {
+      title
+      id
+      type
+      members(first: 2) {
+        items {
+          id
+          displayName
+          email
+        }
+      }
+    }
+  }
+}"""
+    params = {}
+    if (after):
+        params = {'variables': '''{{"after": "{0}"}}'''.format(after)}
+    response = graphql_request(
+        request=request, params=params, auth_token=auth_token)
+    return handle_json_response(response, ("data", "directMessagingSpaces"))
+
+
+def get_team_spaces_page(after: str, auth_token: str) -> list:
     logger.info("Getting spaces starting after %s", after)
     request = """query getSpaces($after: String) {
   spaces(first: 200, after: $after) {
@@ -215,6 +263,7 @@ def get_spaces(after: str, auth_token: str) -> list:
     items {
       title
       id
+      type
     }
   }
 }"""
@@ -259,8 +308,8 @@ def get_space_members(space_id: str, after: str, auth_token: str) -> list:
 def get_space_files(space_id: str, fetch_before_timestamp: str, auth_token: str) -> list:
     """Get space files for the given space id. We use backward paging here since
     the order we fetch isn't important when saving as files, and the api
-    doesn't seem to work well with oldestTimestamp and last parameters. It seems
-    that oldestTimestamp gets ignored."""
+    doesn't seem to work well with oldestTimestamp and last parameters. It
+    seems that oldestTimestamp gets ignored."""
     logger.info("Getting files for space %s before %s",
                 space_id, fetch_before_timestamp)
 

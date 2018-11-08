@@ -15,7 +15,6 @@
 import client
 
 import logging
-import os
 import csv
 import datetime
 import json
@@ -33,25 +32,24 @@ file_entries_file_name = "entries.json"
 file_paths_file_name = "paths.json"
 
 
-class Options(Enum):
-    MEMBERS = 1
-    MESSAGES = 2
-    FILES = 3
-    ALLFILES = 4
+class FileOptions(Enum):
+    none = "NONE"
+    resume = "RESUME"
+    all = "ALL"
+
+    def __str__(self):
+        return self.value
 
 
-def get_all_spaces(auth_token: str) -> list:
-    after = None
-    all_spaces = []
-    while True:
-        spaces_page = client.get_spaces(after, auth_token)
-        all_spaces.extend(spaces_page["items"])
+ResumePoint = namedtuple('ResumePoint', ['last_time', 'last_id'])
 
-        if (spaces_page["pageInfo"]["hasNextPage"]):
-            after = spaces_page["pageInfo"]["endCursor"]
-        else:
-            break
-    return all_spaces
+
+def get_all_dm_spaces(auth_token: str) -> list:
+    return client.get_all(client.get_dm_spaces_page, auth_token)
+
+
+def get_all_team_spaces(auth_token: str) -> list:
+    return client.get_all(client.get_team_spaces_page, auth_token)
 
 
 def export_space_members(space_id: str, filename: str, auth_token: str) -> list:
@@ -162,6 +160,7 @@ def export_space_files(space_id: str, folder: PurePath, auth_token: str, fetch_a
                 break
 
     finally:
+        # if we have some metadata, write it
         if len(file_graphqlitem_by_id) > 0:
             file_entries_file_path.parent.mkdir(exist_ok=True, parents=True)
             with open(file_entries_file_path, "w+") as f:
@@ -204,9 +203,6 @@ def get_messages_path(space_export_root: str, year: int, month: int) -> str:
     return space_export_root / str(year) / "messages {}.csv".format(month)
 
 
-ResumePoint = namedtuple('ResumePoint', ['last_time', 'last_id'])
-
-
 def find_messages_resume_point(space_export_root) -> ResumePoint:
     for year in range(datetime.datetime.now().year, 2014, -1):
         for month in range(12, 1, -1):
@@ -221,7 +217,7 @@ def find_messages_resume_point(space_export_root) -> ResumePoint:
                             last_message_time = line[3]
                         else:
                             log.warn(
-                                "found a line shorter than expected in %s when looking for resume point", path)
+                                "Found a line shorter than expected in %s when looking for resume point. You may want to delete (or move) this space's local messages and try again.", path)
                     if last_message_time:
                         try:
                             previous_time_in_milliseconds = int(
@@ -232,20 +228,50 @@ def find_messages_resume_point(space_export_root) -> ResumePoint:
     return ResumePoint(0, None)
 
 
-def export_space(space: dict, auth_token: str, export_members: bool, export_messages: bool, export_files: bool, restart_files: bool, export_root_folder: PurePath = Path.home() / "Watson Workspace Export") -> None:
+def get_DM_participant(space: dict, auth_token: str) -> dict:
+    dm_participant = None
+    if space["members"] and space["members"]["items"]:
+        current_user = client.get_current_user(auth_token)
+        other_participants = [member for member in space["members"]["items"] if member["id"] != current_user["id"]]
+        if len(other_participants) == 1:
+            dm_participant = other_participants[0]
+        else:
+            logger.error("%s looked like a direct messaging space, but it has %s participants other than yourself", space["id"], len(other_participants))
+    else:
+        logger.error("%s looked like a direct messaging space, but we didn't get any members for it", space["id"])
+    return dm_participant
+
+
+def get_space_folder(space: dict, root_path: PurePath, auth_token: str):
+    space_folder_name = space["id"]
+    if space["type"] == "DIRECT":
+        other_participant = get_DM_participant(space, auth_token)
+        if other_participant:
+            space_folder_name = root_path / "DM" / "{} - {}".format(other_participant["displayName"], other_participant["email"])
+        else:
+            space_folder_name = root_path / "DM" / space["id"]
+            logger.error("space with id %s at %s like a direct messaging space, but we didn't find another member in it - we'll generate the directory name based on the user ID", space["id"], space_folder_name)
+    else:
+        if space["type"] != "TEAM":
+            logger.warn("space with id %s has type %s - neither TEAM nor DIRECT (DM) - will treat the space as a team space", space["id"], space["type"])
+        if space["title"]:
+            space_folder_name = root_path / "SPACE" / "{} {}".format(space["title"].replace("/", "-"), space["id"])
+        else:
+            space_folder_name = root_path / "SPACE" / space["id"]
+            logger.warn("space with id %s at %s lacks a title", space["id"], space_folder_name)
+
+
+    return root_path / space_folder_name
+
+
+def export_space(space: dict, auth_token: str, export_root_folder: PurePath, file_options: FileOptions = FileOptions.none, export_members: bool = True, export_messages: bool = True) -> None:
     export_time = datetime.datetime.now()
 
-    space_folder_name = "{} {}".format(
-        space["title"].replace("/", "-"), space["id"])
-    space_export_root = export_root_folder / space_folder_name
+    space_export_root = get_space_folder(space, export_root_folder, auth_token)
     space_export_root.mkdir(exist_ok=True, parents=True)
 
     logger.info(">>Exporting %s with ID %s to %s",
                 space["title"], space["id"], space_export_root)
-
-    if not space["title"]:
-        logger.warn("space with id %s at %s lacks a title - this could be a DM space",
-                    space["id"], space_folder_name)
 
     if export_members:
         export_space_members(space["id"], space_export_root / "members {}.csv".format(
@@ -259,14 +285,16 @@ def export_space(space: dict, auth_token: str, export_members: bool, export_mess
                     last_known_id, next_page_time_in_milliseconds)
         previous_page_ids.add(last_known_id)
 
-    if export_files:
+    if file_options != FileOptions.none:
         files_folder_path = space_export_root / "files"
         files_folder_path.mkdir(exist_ok=True, parents=True)
-        if restart_files:
+        if file_options == FileOptions.all:
             export_space_files(space["id"], files_folder_path, auth_token)
-        else:
+        elif file_options == FileOptions.resume:
             export_space_files(
                 space["id"], files_folder_path, auth_token, next_page_time_in_milliseconds)
+        else:
+            logger.warn("Unsupported file option")
 
     # write message file
     # iterate over pages of messages for the space. We reverse them since they are in reverse chronological order
