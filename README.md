@@ -16,7 +16,7 @@ Due to the possible expiration of the JWT auth token, and potential for other is
 1. Make sure you have Python 3.x installed (check with `python --version`)
 2. Change to the directory containing this project
 3. Obtain your JWT from Workspace
-![Obtaining your JWT](docs/Obtaining your JWT.gif)
+![Obtaining your JWT](docs/UserJWT.gif)
 4. Run `python wwexport --jwt=WATSON_WORK_JWT`
 
 Run `python wwexport -h` for more options, including options on exporting files.
