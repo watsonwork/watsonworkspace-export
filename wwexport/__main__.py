@@ -13,10 +13,12 @@
 # limitations under the License.
 
 import core
-import client
+import queries
+import requests
 import sys
 import argparse
 import getpass
+import json
 import logging
 import logging.handlers
 from enum import Enum
@@ -71,6 +73,8 @@ def main(argv):
 
     args = parser.parse_args()
 
+    export_root.mkdir(exist_ok=True, parents=True)
+
     logger = logging.getLogger("wwexport")
     # set to the the finest level on the top level logger - the actual LogLevel
     # is controled by the handlers
@@ -109,26 +113,38 @@ def main(argv):
     try:
         spaces_to_export = []
         if args.spaceid:
-            spaces_to_export.append(client.get_space(args.spaceid, auth_token))
+            spaces_to_export.append(queries.space.execute(auth_token, spaceid=args.spaceid))
         else:
             if args.type == SpaceType.spaces or args.type == SpaceType.all:
-                spaces_to_export.extend(core.get_all_team_spaces(auth_token))
+                spaces = queries.team_spaces.all_pages(auth_token)
+                with open(export_root / "spaces.json", "w+") as f:
+                    json.dump(spaces, f)
+                spaces_to_export.extend(spaces)
 
             if args.type == SpaceType.dms or args.type == SpaceType.all:
-                spaces_to_export.extend(core.get_all_dm_spaces(auth_token))
+                dm_spaces = queries.dm_spaces.all_pages(auth_token)
+                with open(export_root / "dms.json", "w+") as f:
+                    json.dump(dm_spaces, f)
+                spaces_to_export.extend(dm_spaces)
 
         for space in spaces_to_export:
             core.export_space(space, auth_token, export_root, args.files)
 
-    except client.UnauthorizedRequestError:
+    except queries.UnauthorizedRequestError:
         logger.error("Export incomplete. Looks like your JWT might have timed out or is invalid. Good thing this is resumable. Go get a new one and run this again. We'll pick up from where we left off (more or less).")
         sys.exit(1)
-    except client.UnknownRequestError as err:
+    except queries.UnknownRequestError as err:
         logger.exception(
             "Export incomplete. Aborting with HTTP status code %s with response %s. If problem persists, run with a debug enabled and check the prior request. You may also run the export space by space.", err.status_code, err.text)
         sys.exit(1)
-    except client.GraphQLError:
+    except queries.GraphQLError:
         logger.exception("Export incomplete. Terminating with GraphQLError. If problem persists, run with a debug enabled and check the prior request. You may also run the export space by space.")
+        sys.exit(1)
+    except requests.exceptions.ConnectionError:
+        logger.exception("Export incomplete. Connection was interrupted. Restart the export and it will resume where you left off (for the most part)")
+        sys.exit(1)
+    except Exception:
+        logger.exception("Export incomplete. Unknown error.")
         sys.exit(1)
     else:
         logger.info("Completed export")
