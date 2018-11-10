@@ -13,7 +13,7 @@ Due to the possible expiration of the JWT auth token, and potential for other is
 
 ## Setup
 
-1. Make sure you have Python 3.7 installed (check with `python --version`)
+1. Make sure you have Python 3.x installed (check with `python --version`). Note: this package was developed with python 3.7.
 2. Install required packages. There are many ways to do this, but the most simple may be to run `pip install -r requirements.txt` from the project directory (you may need to use `pip3` instead of `pip` depending on your environment). A Pipfile is also provided if you choose to use pipenv commands.
 
 ## Running
