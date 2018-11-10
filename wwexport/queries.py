@@ -62,7 +62,6 @@ class Query:
         self.graphql_views = graphql_views
 
     def __graphql_headers(self, auth_token: str) -> dict:
-        global __graphql_views
         return {'jwt': auth_token, 'Content-Type': 'application/graphql', 'x-graphql-view': self.graphql_views}
 
     @staticmethod
