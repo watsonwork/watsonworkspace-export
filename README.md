@@ -11,13 +11,17 @@ This can be a very long running process, and currently, it is possible for a JWT
 
 Due to the possible expiration of the JWT auth token, and potential for other issues or network disruptions during such a long running process, the export was made resumable. If the tool detects messages already exported for a space, it will attempt to find the most recently message and will continue from that point. This feature is also useful if you want to export a space, and then later on rerun the export to get new messages since your last export. In this case, the tool can be used to incrementally export a space, though it will not consider message edits or deletions.
 
+## Setup
+
+1. Make sure you have Python 3.7 installed (check with `python --version`)
+2. Install required packages. There are many ways to do this, but the most simple may be to run `pip install -r requirements.txt` from the project directory (you may need to use `pip3` instead of `pip` depending on your environment). A Pipfile is also provided if you choose to use pipenv commands.
+
 ## Running
 
-1. Make sure you have Python 3.x installed (check with `python --version`)
-2. Change to the directory containing this project
-3. Obtain your JWT from Workspace
+1. Change to the directory containing this project
+2. Obtain your JWT from Workspace
 ![Obtaining your JWT](docs/UserJWT.gif)
-4. Run `python wwexport --jwt=WATSON_WORK_JWT`
+3. Run `python wwexport --jwt=WATSON_WORK_JWT`
 
 Run `python wwexport -h` for more options, including options on exporting files.
 
