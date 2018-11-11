@@ -19,6 +19,10 @@ FILES_META_FOLDER = "_meta"
 FILE_ENTRIES_FILE_NAME = "entries.json"
 FILE_PATHS_FILE_NAME = "paths.json"
 
+OAUTH_URL = "https://api.watsonwork.ibm.com/oauth/token"
+OAUTH_REQUEST_HEADERS = {'Content-Type': 'application/x-www-form-urlencoded'}
+JWT_TOKEN_REFRESH_BUFFER = datetime.timedelta(seconds=60)
+
 GRAPHQL_URL = "https://api.watsonwork.ibm.com/graphql"
 GRAPHQL_VIEWS = "DIRECT_MESSAGING,RESOURCE,TYPED_ANNOTATIONS,EXPERIMENTAL,PUBLIC"
 

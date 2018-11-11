@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import constants
+import auth
 
 import datetime
 import requests
@@ -61,8 +62,8 @@ class Query:
         self.api_url = api_url
         self.graphql_views = graphql_views
 
-    def __graphql_headers(self, auth_token: str) -> dict:
-        return {'jwt': auth_token, 'Content-Type': 'application/graphql', 'x-graphql-view': self.graphql_views}
+    def __graphql_headers(self, auth_token: auth.AuthToken) -> dict:
+        return {'jwt': auth_token.jwt_token(), 'Content-Type': 'application/graphql', 'x-graphql-view': self.graphql_views}
 
     @staticmethod
     def __handle_json_response(response: requests.Response, reference_to_get: list):
@@ -89,7 +90,7 @@ class Query:
                 return None
         return next_level
 
-    def __graphql_request(self, auth_token: str, request: str, params: str = None) -> requests.Response:
+    def __graphql_request(self, auth_token: auth.AuthToken, request: str, params: str = None) -> requests.Response:
         now = datetime.datetime.now()
         if type(self).__last_graphql_request_time:
             elapsed = now - type(self).__last_graphql_request_time
@@ -113,14 +114,14 @@ class Query:
 
         return response
 
-    def execute(self, auth_token: str, **kwargs: dict):
+    def execute(self, auth_token: auth.AuthToken, **kwargs: dict):
         params = {'variables': json.dumps(kwargs)} if kwargs is not None else {}
         logger.info("Executing query %s with params %s", self.name, params)
         response = self.__graphql_request(
             request=self.query_string, params=params, auth_token=auth_token)
         return self.__handle_json_response(response, self.key_reference)
 
-    def all_pages(self, auth_token: str, **kwargs: dict):
+    def all_pages(self, auth_token: auth.AuthToken, **kwargs: dict):
         """Iterately calls execute with the provided query, using standard
         pagination conventions, and using kwargs as variables in the query"""
         after = None
@@ -137,8 +138,8 @@ class Query:
         return all
 
 
-def __download_headers(auth_token: str) -> dict:
-    return {'jwt': auth_token}
+def __download_headers(auth_token: auth.AuthToken) -> dict:
+    return {'jwt': auth_token.jwt_token()}
 
 
 def download(file_id: str, file_title: str, folder: PurePath, auth_token: str):

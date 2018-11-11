@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import queries
+import auth
 
 import constants
 import logging
@@ -41,7 +42,7 @@ class FileOptions(Enum):
 ResumePoint = namedtuple('ResumePoint', ['last_time', 'last_id'])
 
 
-def export_space_members(space_id: str, filename: str, auth_token: str) -> list:
+def export_space_members(space_id: str, filename: str, auth_token: auth.AuthToken) -> list:
     with open(filename, "w+") as space_members_file:
         space_members_writer = csv.writer(space_members_file)
         space_members = []

@@ -14,6 +14,8 @@
 
 import core
 import queries
+import auth
+
 import requests
 import sys
 import argparse
@@ -55,8 +57,13 @@ def main(argv):
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         description="Export utility for Watson Workspace. This utility will create a directory at `{}` to export to.".format(export_root),
         epilog="For example, to export spaces without files, run `python wwexport`. To export spaces with files, run `python wwexport --files=ALL`. To export all spaces and DMs with all files, run `python wwexport --type=ALL --files=ALL`. Always check the {} file in your export directory. Source at https://github.ibm.com/jbrunn/watsonworkspace_export".format(error_file_name))
-    parser.add_argument(
-        "--jwt", help="JWT token for accessing Watson Work. If ommitted, you may enter interactively, but interactive mode may not work in some terminals due to input length limits.")
+
+    auth_group = parser.add_mutually_exclusive_group()
+
+    auth_group.add_argument(
+        "--appcred", help="App credentials specified as appId:appSecret, obtained for an app from https://developer.watsonwork.ibm.com/apps. If both AppCred and JWT are specified, JWT is ignored. If AppCred is used, spaces to which the app has been directly added will be available for export.")
+    auth_group.add_argument(
+        "--jwt", help="JWT token for accessing Watson Work. If both JWT and AppCred are omitted, you may enter a JWT interactively, but interactive mode may not work in some terminals due to input length limits.")
 
     space_args = parser.add_mutually_exclusive_group()
     space_args.add_argument(
@@ -103,11 +110,22 @@ def main(argv):
     logger.addHandler(console_log_handler)
 
     # auth
-    auth_token = args.jwt
-    if not auth_token:
-        auth_token = getpass.getpass("Watson Work Auth Token (JWT): ")
+    auth_token = None
+    appcred = args.appcred
+    if appcred:
+        appcred_list = appcred.split(":")
+        if len(appcred_list) != 2:
+            logger.critical("Invalid AppCred format. The AppCred should have your appID and appSecret separated by a single colon (:). It appears there are %s colons in your appcred.", len(appcred_list) - 1)
+            sys.exit(1)
+        else:
+            auth_token = auth.AppAuthToken(appcred_list[0], appcred_list[1])
+    elif args.jwt:
+        auth_token = auth.JWTAuthToken(args.jwt)
+    else:
+        auth_token = auth.JWTAuthToken(getpass.getpass("Watson Work Auth Token (JWT): "))
 
     # let's do this!
+
     logger.info("Starting export")
 
     try:
@@ -142,6 +160,9 @@ def main(argv):
         sys.exit(1)
     except requests.exceptions.ConnectionError:
         logger.exception("Export incomplete. Connection was interrupted. Restart the export and it will resume where you left off (for the most part)")
+        sys.exit(1)
+    except auth.UnauthorizedRequestError:
+        logger.exception("Export incomplete. Unable to authenticate or reauthenticate.")
         sys.exit(1)
     except Exception:
         logger.exception("Export incomplete. Unknown error.")
