@@ -31,7 +31,6 @@ When files are exported, additional metadata files are created to save informati
 
 - Accept a refresh token to refresh the JWT
 - Add support for topics
-- Add an optional flag to export annotations
 - Make the resume tolerant of space name changes
 - Update the members so multiple runs don't leave a lot of members files
 - Enhance message export so message rows include lists of local file paths, not just the file IDs embedded in the message, to make finding local exported files from messages easier.
