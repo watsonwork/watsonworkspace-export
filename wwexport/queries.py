@@ -320,6 +320,32 @@ space_messages = Query("Space Messages", """query getMessages($spaceid: ID!, $ol
   }
 }""", ["data", "space", "conversation", "messages", "items"])
 
+space_messages_with_annotations = Query("Space Messages with Annotations", """query getMessages($spaceid: ID!, $oldest: Long) {
+  space(id: $spaceid) {
+    conversation {
+      messages(last: 200, oldestTimestamp: $oldest) {
+        items {
+          id
+          content
+          createdBy {
+            id
+            displayName
+          }
+          created
+          typedAnnotations(include: GENERIC) {
+            ... on GenericAnnotation {
+              text
+              title
+            }
+          }
+          annotations
+        }
+      }
+    }
+  }
+}""", ["data", "space", "conversation", "messages", "items"])
+
+
 current_user = Query("Current User",
                      "query getMe{me{id,displayName,email}}",
                      ["data", "me"])

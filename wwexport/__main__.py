@@ -72,6 +72,8 @@ def main(argv):
 
     parser.add_argument("--files", type=core.FileOptions, choices=list(core.FileOptions), default=core.FileOptions.none, help="Specify how files will be exported, if at all. RESUME will only look at files since the most recently downloaded message. RESUME is useful if you have previously downloaded all files and just want to get any new content. ALL will page through metadata for all files to make sure older files are downloaded. Both options use a local metadata file to skip unnecessary downloads, and both options deduplicate among files in the space with the same name after downloading. You shouldn't have to worry about duplicate files, even if you use the ALL option multiple times. RESUME will be faster, but only use it if you are sure you have all files up to the latest local file already downloaded. If you are unsure, or this is the first time you are downloading files, ALL is suggested.")
 
+    parser.add_argument("--annotations", action="store_true", help="Incude this option to write all annotations in the message files. Even without this option, the content of a generic annotation will be exported if there is no other message content.")
+
     logging_group = parser.add_argument_group("logging")
     logging_group.add_argument(
         "--consolelevel", type=LogLevel, default=LogLevel.info, choices=list(LogLevel), help="Console log level")
@@ -146,7 +148,7 @@ def main(argv):
                 spaces_to_export.extend(dm_spaces)
 
         for space in spaces_to_export:
-            core.export_space(space, auth_token, export_root, args.files)
+            core.export_space(space, auth_token, export_root, args.files, export_annotations=args.annotations)
 
     except queries.UnauthorizedRequestError:
         logger.error("Export incomplete. Looks like your JWT might have timed out or is invalid. Good thing this is resumable. Go get a new one and run this again. We'll pick up from where we left off (more or less).")

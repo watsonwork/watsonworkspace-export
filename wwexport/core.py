@@ -192,8 +192,13 @@ def write_message(message: str, writer: csv.DictWriter) -> None:
             creatorName = message["createdBy"]["displayName"]
         if "id" in message["createdBy"]:
             creatorId = message["createdBy"]["id"]
-    writer.writerow([message["id"], creatorName, creatorId,
-                     message["created"], message["content"]])
+    if "annotations" in message:
+        writer.writerow([message["id"], creatorName, creatorId,
+                        message["created"], message["content"],
+                        message["annotations"]])
+    else:
+        writer.writerow([message["id"], creatorName, creatorId,
+                        message["created"], message["content"]])
 
 
 def get_messages_path(space_export_root: str, year: int, month: int) -> str:
@@ -262,7 +267,7 @@ def get_space_folder(space: dict, root_path: PurePath, auth_token: str):
     return root_path / space_folder_name
 
 
-def export_space(space: dict, auth_token: str, export_root_folder: PurePath, file_options: FileOptions = FileOptions.none, export_members: bool = True, export_messages: bool = True) -> None:
+def export_space(space: dict, auth_token: str, export_root_folder: PurePath, file_options: FileOptions = FileOptions.none, export_members: bool = True, export_messages: bool = True, export_annotations: bool = False) -> None:
     export_time = datetime.datetime.now()
 
     space_export_root = get_space_folder(space, export_root_folder, auth_token)
@@ -304,8 +309,9 @@ def export_space(space: dict, auth_token: str, export_root_folder: PurePath, fil
 
         # while there are no more pages of messages
         space_messages_file = None
-        while export_messages:
-            space_messages_page = queries.space_messages.execute(auth_token, spaceid=space["id"], oldest=next_page_time_in_milliseconds)
+        message_query = queries.space_messages_with_annotations if export_annotations else queries.space_messages
+        while export_messages or export_annotations:
+            space_messages_page = message_query.execute(auth_token, spaceid=space["id"], oldest=next_page_time_in_milliseconds)
             if not space_messages_page:
                 if message_count == 0:
                     if last_known_id:
@@ -367,8 +373,12 @@ def export_space(space: dict, auth_token: str, export_root_folder: PurePath, fil
                         if not resuming_file:
                             logger.debug(
                                 "Starting a new file. Writing header.")
-                            space_messages_writer.writerow(
-                                ["message id", "author name", "author id", "created date", "content"])
+                            if export_annotations:
+                                space_messages_writer.writerow(
+                                    ["message id", "author name", "author id", "created date", "content", "annotations"])
+                            else:
+                                space_messages_writer.writerow(
+                                    ["message id", "author name", "author id", "created date", "content"])
 
                     write_message(message, space_messages_writer)
                 else:
