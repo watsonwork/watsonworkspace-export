@@ -56,7 +56,7 @@ def main(argv):
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         description="Export utility for Watson Workspace. This utility will create a directory at `{}` to export to.".format(export_root),
-        epilog="For example, to export spaces without files, run `python wwexport`. To export spaces with files, run `python wwexport --files=ALL`. To export all spaces and DMs with all files, run `python wwexport --type=ALL --files=ALL`. Always check the {} file in your export directory. Source at https://github.ibm.com/jbrunn/watsonworkspace_export".format(error_file_name))
+        epilog="For example, to export spaces without files, run `python wwexport`. To export spaces with files, run `python wwexport --files=ALL`. To export all spaces and DMs with all files, run `python wwexport --type=ALL --files=ALL`. Always check the {} file in your export directory. Source at https://github.com/brunnjf/watsonworkspace-export".format(error_file_name))
 
     auth_group = parser.add_mutually_exclusive_group()
 

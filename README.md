@@ -26,11 +26,3 @@ Due to the possible expiration of the JWT auth token, and potential for other is
 Run `python wwexport -h` for more options, including options on exporting files.
 
 When files are exported, additional metadata files are created to save information about file creators, dates, and the relationship of file IDs to paths on the local file system. This aids when resuming an export since the tool uses the metadata files to skips downloads of files already downloaded. Unless IDs were used as file names (which is not very user friendly), it is otherwise not possible to know which files were downloaded without meta files, since multiple files can have the same name in a space. These meta files are also helpful in knowing information on the message associated with a file, or finding the file corresponding to a message.
-
-## Unfinished
-
-- Accept a refresh token to refresh the JWT
-- Add support for topics
-- Make the resume tolerant of space name changes
-- Update the members so multiple runs don't leave a lot of members files
-- Enhance message export so message rows include lists of local file paths, not just the file IDs embedded in the message, to make finding local exported files from messages easier.
