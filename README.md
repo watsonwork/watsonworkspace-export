@@ -18,10 +18,19 @@ Due to the possible expiration of the JWT auth token, and potential for other is
 
 ## Running
 
+### As a user
+
 1. Change to the directory containing this project
 2. Obtain your JWT from Workspace
 ![Obtaining your JWT](docs/UserJWT.gif)
 3. Run `python wwexport --jwt=WATSON_WORK_JWT`
+
+### As an app
+
+1. Change to the directory containing this project
+2. Obtain an app ID and secret from https://developer.watsonwork.ibm.com/apps
+3. Add the app to spaces to be exported
+4. Run `python wwexport --appcred APP_ID:APP_SECRET --spaceid SPACE_TO_EXPORT`
 
 Run `python wwexport -h` for more options, including options on exporting files.
 
