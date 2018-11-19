@@ -20,6 +20,8 @@ import logging
 import csv
 import datetime
 import json
+import os
+import re
 from pathlib import Path
 from pathlib import PurePath
 from dateutil.parser import parse
@@ -28,6 +30,7 @@ from enum import Enum
 
 logger = logging.getLogger("wwexport")
 __current_user = None
+file_path_by_id = {}
 
 
 class FileOptions(Enum):
@@ -42,8 +45,21 @@ class FileOptions(Enum):
 ResumePoint = namedtuple('ResumePoint', ['last_time', 'last_id'])
 
 
+def create_directory(path):
+    if os.path.exists(path):
+        print ("Skip creation of the directory %s, it's existed" % path)
+    else:
+        try:
+            os.makedirs(path)
+        except OSError:
+            print ("Creation of the directory %s failed" % path)
+        else:
+            print ("Successfully created the directory %s " % path)
+
+
 def export_space_members(space_id: str, filename: str, auth_token: auth.AuthToken) -> list:
-    with open(filename, "w+") as space_members_file:
+    create_directory(os.path.abspath(os.path.join(filename, os.pardir)))
+    with open(filename, "w+", encoding='utf-8') as space_members_file:
         space_members_writer = csv.writer(space_members_file)
         space_members = []
         after = None
@@ -64,11 +80,11 @@ def export_space_members(space_id: str, filename: str, auth_token: auth.AuthToke
     return space_members
 
 
-def new_export_space_files(space_id: str, folder: PurePath, auth_token: str) -> int:
+def new_export_space_files(space_id: str, folder: str, auth_token: str) -> int:
     return 0
 
 
-def export_space_files(space_id: str, folder: PurePath, auth_token: str, fetch_after_timestamp: int = 0) -> int:
+def export_space_files(space_id: str, folder: str, auth_token: str, fetch_after_timestamp: int = 0) -> int:
     """Export spaces, starting with the newest and going back only to the
     fetch_after_timestamp. This order is implemented since paging from oldest
     to newest doesn't seem to be implemented for the beta resource API.
@@ -85,14 +101,15 @@ def export_space_files(space_id: str, folder: PurePath, auth_token: str, fetch_a
         logger.info("Exporting files only back to %s ms", fetch_after_timestamp)
 
     file_graphqlitem_by_id = {}
-    file_entries_file_path = folder / constants.FILES_META_FOLDER / constants.FILE_ENTRIES_FILE_NAME
-    if (file_entries_file_path).exists():
-        with open(file_entries_file_path, "r") as f:
+    file_entries_file_path = os.path.normpath(os.path.join(folder, constants.FILES_META_FOLDER, constants.FILE_ENTRIES_FILE_NAME))
+    if os.path.exists(file_entries_file_path):
+        with open(file_entries_file_path, "r", encoding='utf-8') as f:
             file_graphqlitem_by_id = json.load(f)
+    global file_path_by_id
     file_path_by_id = {}
-    file_paths_file_path = folder / constants.FILES_META_FOLDER / constants.FILE_PATHS_FILE_NAME
-    if (file_paths_file_path).exists():
-        with open(file_paths_file_path, "r") as f:
+    file_paths_file_path = os.path.normpath(os.path.join(folder, constants.FILES_META_FOLDER, constants.FILE_PATHS_FILE_NAME))
+    if os.path.exists(file_paths_file_path):
+        with open(file_paths_file_path, "r", encoding='utf-8') as f:
             file_path_by_id = json.load(f)
 
     downloaded = 0
@@ -116,7 +133,8 @@ def export_space_files(space_id: str, folder: PurePath, auth_token: str, fetch_a
                     "Fetched page with no files for space %s, but expected this page to contain at least one file.")
                 break
 
-            folder.mkdir(exist_ok=True, parents=True)
+            #folder.mkdir(exist_ok=True, parents=True)
+            create_directory(folder)
 
             found_file = False
             page_ids = set()
@@ -136,7 +154,7 @@ def export_space_files(space_id: str, folder: PurePath, auth_token: str, fetch_a
                                 next_page_time_in_milliseconds, file_created_ms)
                         else:
                             next_page_time_in_milliseconds = file_created_ms
-                        if file["id"] in file_path_by_id and Path(file_path_by_id[file["id"]]).exists():
+                        if file["id"] in file_path_by_id and os.path.exists(file_path_by_id[file["id"]]):
                             logger.debug(
                                 "file %s is already downloaded to %s, skipping download", file["id"], file_path_by_id[file["id"]])
                             already_downloaded += 1
@@ -159,12 +177,14 @@ def export_space_files(space_id: str, folder: PurePath, auth_token: str, fetch_a
     finally:
         # if we have some metadata, write it
         if len(file_graphqlitem_by_id) > 0:
-            file_entries_file_path.parent.mkdir(exist_ok=True, parents=True)
-            with open(file_entries_file_path, "w+") as f:
+            #file_entries_file_path.parent.mkdir(exist_ok=True, parents=True)
+            create_directory(os.path.abspath(os.path.join(file_entries_file_path, os.pardir)))
+            with open(file_entries_file_path, "w+", encoding='utf-8') as f:
                 json.dump(file_graphqlitem_by_id, f)
         if len(file_path_by_id) > 0:
-            file_paths_file_path.parent.mkdir(exist_ok=True, parents=True)
-            with open(file_paths_file_path, "w+") as f:
+            #file_paths_file_path.parent.mkdir(exist_ok=True, parents=True)
+            create_directory(os.path.abspath(os.path.join(file_paths_file_path, os.pardir)))
+            with open(file_paths_file_path, "w+", encoding='utf-8') as f:
                 json.dump(file_path_by_id, f)
 
     logger.info("Downloaded %s files, %s files were skipped because they were downloaded according to meta files, %s downloaded files were duplicates of files already downloaded",
@@ -172,7 +192,26 @@ def export_space_files(space_id: str, folder: PurePath, auth_token: str, fetch_a
     return downloaded
 
 
-def write_message(message: str, writer: csv.DictWriter) -> None:
+def get_files_loc_from_content(content):
+    # get file ids from msg content
+    file_ids = []
+    founds = [m.start() for m in re.finditer('<\$file\|', content)]
+    for index in founds:
+        start = index + 7
+        substr = content[start:]
+        end = substr.index('|')
+        file_ids.append(substr[0:end])
+
+    file_paths = []
+    for id in file_ids:
+        if id in file_path_by_id:
+            file_paths.append(file_path_by_id.get(id))
+    if len(file_paths) > 0:
+        return " | ".join(file_paths)
+    else:
+        return ""
+
+def write_message(message: str, writer: csv.DictWriter, file_options: FileOptions = FileOptions.none) -> None:
     # if there isn't content, pull it from the annotation if there is one
     if message["content"] is None:
         if message["typedAnnotations"] is not None and len(message["typedAnnotations"]) > 0:
@@ -192,31 +231,33 @@ def write_message(message: str, writer: csv.DictWriter) -> None:
             creatorName = message["createdBy"]["displayName"]
         if "id" in message["createdBy"]:
             creatorId = message["createdBy"]["id"]
+
+    row_content = [message["id"], creatorName, creatorId,message["created"], repr(message["content"])]
     if "annotations" in message:
-        writer.writerow([message["id"], creatorName, creatorId,
-                        message["created"], message["content"],
-                        message["annotations"]])
-    else:
-        writer.writerow([message["id"], creatorName, creatorId,
-                        message["created"], message["content"]])
+        row_content.append(message["annotations"])
+    if file_options != FileOptions.none:
+        file_paths_str = get_files_loc_from_content(repr(message["content"]))
+        row_content.append(file_paths_str)
+    writer.writerow(row_content)
 
 
-def get_messages_path(space_export_root: str, year: int, month: int) -> str:
-    return space_export_root / str(year) / constants.MESSAGES_FILE_NAME_PATTERN.format(month)
+def get_messages_path(space_export_root: str, year: int, month: int):
+    return os.path.normpath(os.path.join(space_export_root, str(year), constants.MESSAGES_FILE_NAME_PATTERN.format(month)))
 
 
 def find_messages_resume_point(space_export_root) -> ResumePoint:
     for year in range(datetime.datetime.now().year, 2014, -1):
         for month in range(12, 1, -1):
             path = get_messages_path(space_export_root, year, month)
-            if path.exists():
+            if os.path.exists(path):
                 logger.debug("Found possible resume point in %s", path)
-                with open(path, "r") as space_messages_file:
+                with open(path, "r", encoding='utf-8') as space_messages_file:
                     space_messages_reader = csv.reader(space_messages_file)
                     last_message_time = None
                     for line in space_messages_reader:
                         if len(line) >= 4:
                             last_message_time = line[3]
+                            last_message_id = line[0]
                         else:
                             logger.warn(
                                 "Found a line shorter than expected in %s when looking for resume point. You may want to delete (or move) this space's local messages and try again.", path)
@@ -224,7 +265,8 @@ def find_messages_resume_point(space_export_root) -> ResumePoint:
                         try:
                             previous_time_in_milliseconds = int(
                                 parse(last_message_time).timestamp() * 1000)
-                            return ResumePoint(previous_time_in_milliseconds, line[0])
+                            logger.info("Last Message ID: %s, Time: %s, Timestamp: %s", last_message_id, last_message_time, previous_time_in_milliseconds)
+                            return ResumePoint(previous_time_in_milliseconds, last_message_id)
                         except ValueError:
                             pass
     return ResumePoint(0, None)
@@ -246,38 +288,37 @@ def get_DM_participant(space: dict, auth_token: str) -> dict:
     return dm_participant
 
 
-def get_space_folder(space: dict, root_path: PurePath, auth_token: str):
+def get_space_folder(space: dict, root_path: str, auth_token: str):
     space_folder_name = space["id"]
     if space["type"] == "DIRECT":
         other_participant = get_DM_participant(space, auth_token)
         if other_participant:
-            space_folder_name = root_path / "DM" / "{} - {}".format(other_participant["displayName"], other_participant["email"])
+            space_folder_name = os.path.normpath(os.path.join(root_path, "DM", "{} - {}".format(other_participant["displayName"], other_participant["email"])))
         else:
-            space_folder_name = root_path / "DM" / space["id"]
+            space_folder_name = os.path.normpath(os.path.join(root_path, "DM", space["id"]))
             logger.error("space with id %s at %s like a direct messaging space, but we didn't find another member in it - we'll generate the directory name based on the user ID", space["id"], space_folder_name)
     else:
         if space["type"] != "TEAM":
             logger.warn("space with id %s has type %s - neither TEAM nor DIRECT (DM) - will treat the space as a team space", space["id"], space["type"])
         if space["title"]:
-            space_folder_name = root_path / "SPACE" / "{} {}".format(space["title"].replace("/", "-"), space["id"])
+            space_folder_name = os.path.normpath(os.path.join(root_path, "SPACE", "{} {}".format(space["title"].replace("/", "-"), space["id"])))
         else:
-            space_folder_name = root_path / "SPACE" / space["id"]
+            space_folder_name = os.path.normpath(os.path.join(root_path, "SPACE", space["id"]))
             logger.warn("space with id %s at %s lacks a title", space["id"], space_folder_name)
 
-    return root_path / space_folder_name
+    return os.path.normpath(os.path.join(root_path, space_folder_name))
 
 
-def export_space(space: dict, auth_token: str, export_root_folder: PurePath, file_options: FileOptions = FileOptions.none, export_members: bool = True, export_messages: bool = True, export_annotations: bool = False) -> None:
+def export_space(space: dict, auth_token: str, export_root_folder: str, file_options: FileOptions = FileOptions.none, export_members: bool = True, export_messages: bool = True, export_annotations: bool = False) -> None:
     export_time = datetime.datetime.now()
 
     space_export_root = get_space_folder(space, export_root_folder, auth_token)
-    space_export_root.mkdir(exist_ok=True, parents=True)
+    create_directory(space_export_root)
 
     logger.info(">> Exporting space with ID %s to %s", space["id"], space_export_root)
 
     if export_members:
-        export_space_members(space["id"], space_export_root / "members {}.csv".format(
-            export_time.strftime("%Y-%m-%d %H.%M")), auth_token)
+        export_space_members(space["id"], os.path.normpath(os.path.join(space_export_root, "members {}.csv".format(export_time.strftime("%Y-%m-%d %H.%M")))), auth_token)
 
     next_page_time_in_milliseconds, last_known_id = find_messages_resume_point(
         space_export_root)
@@ -288,7 +329,7 @@ def export_space(space: dict, auth_token: str, export_root_folder: PurePath, fil
         previous_page_ids.add(last_known_id)
 
     if file_options != FileOptions.none:
-        files_folder_path = space_export_root / "files"
+        files_folder_path = os.path.normpath(os.path.join(space_export_root, "files"))
         if file_options == FileOptions.all:
             export_space_files(space["id"], files_folder_path, auth_token)
         elif file_options == FileOptions.resume:
@@ -362,25 +403,26 @@ def export_space(space: dict, auth_token: str, export_root_folder: PurePath, fil
                             space_messages_file.flush()
                             space_messages_file.close()
 
-                        new_messages_path.parent.mkdir(
-                            exist_ok=True, parents=True)
+                        #new_messages_path.parent.mkdir(
+                        #    exist_ok=True, parents=True)
+                        create_directory(os.path.abspath(os.path.join(new_messages_path, os.pardir)))
 
-                        resuming_file = new_messages_path.exists()
-                        space_messages_file = open(new_messages_path, "a")
+                        resuming_file = os.path.exists(new_messages_path)
+                        space_messages_file = open(new_messages_path, "a", encoding='utf-8')
                         current_messages_path = new_messages_path
 
                         space_messages_writer = csv.writer(space_messages_file)
                         if not resuming_file:
                             logger.debug(
                                 "Starting a new file. Writing header.")
+                            row_headers = ["message id", "author name", "author id", "created date", "content"]
                             if export_annotations:
-                                space_messages_writer.writerow(
-                                    ["message id", "author name", "author id", "created date", "content", "annotations"])
-                            else:
-                                space_messages_writer.writerow(
-                                    ["message id", "author name", "author id", "created date", "content"])
+                                row_headers.append("annotations")
+                            if  file_options != FileOptions.none:
+                                row_headers.append("files")
+                            space_messages_writer.writerow(row_headers)
 
-                    write_message(message, space_messages_writer)
+                    write_message(message, space_messages_writer, file_options)
                 else:
                     logger.debug(
                         "Skipping message with ID %s. This may just mean this message was on a prior page. This should normally happen exactly once per page, other than the first page, which it should not occur.", message["id"])

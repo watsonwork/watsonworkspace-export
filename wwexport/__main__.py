@@ -23,10 +23,11 @@ import getpass
 import json
 import logging
 import logging.handlers
+import os
 from enum import Enum
 from pathlib import Path
 
-export_root = Path.home() / "Watson Workspace Export"
+export_root = os.path.normpath(os.path.join(Path.home(),"Watson Workspace Export"))
 debug_file_name = "debug.log"
 error_file_name = "errors.log"
 
@@ -50,6 +51,17 @@ class LogLevel(Enum):
 
     def __str__(self):
         return self.value
+
+def create_directory(path):
+    if os.path.exists(path):
+        print ("Skip creation of the directory %s, it's existed" % path)
+    else:
+        try:
+            os.mkdir(path)
+        except OSError:
+            print ("Creation of the directory %s failed" % path)
+        else:
+            print ("Successfully created the directory %s " % path)
 
 
 def main(argv):
@@ -82,7 +94,8 @@ def main(argv):
 
     args = parser.parse_args()
 
-    export_root.mkdir(exist_ok=True, parents=True)
+    #export_root.mkdir(exist_ok=True, parents=True)
+    create_directory(export_root)
 
     logger = logging.getLogger("wwexport")
     # set to the the finest level on the top level logger - the actual LogLevel
@@ -94,7 +107,7 @@ def main(argv):
 
     # error log
     error_log_handler = logging.handlers.RotatingFileHandler(
-        export_root / error_file_name, maxBytes=1048576, backupCount=10)
+        os.path.normpath(os.path.join(export_root, error_file_name)), maxBytes=1048576, backupCount=10, encoding="UTF-8")
     error_log_handler.setFormatter(default_formatter)
     error_log_handler.setLevel(logging.WARN)
     logger.addHandler(error_log_handler)
@@ -102,7 +115,7 @@ def main(argv):
     # optional debug log
     if args.loglevel and args.loglevel != LogLevel.none:
         file_log_handler = logging.handlers.RotatingFileHandler(
-            export_root / debug_file_name, maxBytes=1048576, backupCount=10)
+            os.path.normpath(os.path.join(export_root, debug_file_name)), maxBytes=1048576, backupCount=10)
         file_log_handler.setFormatter(default_formatter)
         file_log_handler.setLevel(str(args.loglevel))
         logger.addHandler(file_log_handler)
@@ -137,13 +150,13 @@ def main(argv):
         else:
             if args.type == SpaceType.spaces or args.type == SpaceType.all:
                 spaces = queries.team_spaces.all_pages(auth_token)
-                with open(export_root / "spaces.json", "w+") as f:
+                with open(os.path.normpath(os.path.join(export_root, "spaces.json")), "w+", encoding='utf-8') as f:
                     json.dump(spaces, f)
                 spaces_to_export.extend(spaces)
 
             if args.type == SpaceType.dms or args.type == SpaceType.all:
                 dm_spaces = queries.dm_spaces.all_pages(auth_token)
-                with open(export_root / "dms.json", "w+") as f:
+                with open(os.path.normpath(os.path.join(export_root, "dms.json")), "w+", encoding='utf-8') as f:
                     json.dump(dm_spaces, f)
                 spaces_to_export.extend(dm_spaces)
 

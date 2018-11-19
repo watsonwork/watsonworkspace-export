@@ -21,6 +21,7 @@ import logging
 import json
 import time
 import filecmp
+import os
 from pathlib import PurePath
 
 logger = logging.getLogger("wwexport")
@@ -142,7 +143,7 @@ def __download_headers(auth_token: auth.AuthToken) -> dict:
     return {'jwt': auth_token.jwt_token()}
 
 
-def download(file_id: str, file_title: str, folder: PurePath, auth_token: str):
+def download(file_id: str, file_title: str, folder: str, auth_token: str):
     logger.info("Downloading file %s with title %s", file_id, file_title)
     download_url = constants.FILE_DOWNLOAD_URL_FORMAT.format(file_id)
     logger.debug("file url %s", download_url)
@@ -163,7 +164,7 @@ def download(file_id: str, file_title: str, folder: PurePath, auth_token: str):
     bytes_written = 0
     new_file = False
 
-    temp_file_path = folder / file_id
+    temp_file_path = os.path.normpath(os.path.join(folder, file_id))
 
     try:
         # download to a temp file by using the id as the file name
@@ -174,34 +175,39 @@ def download(file_id: str, file_title: str, folder: PurePath, auth_token: str):
                     bytes_written += len(chunk)
         logger.debug("wrote %s bytes", bytes_written)
 
-        base_file_path = folder / file_title
+        base_file_path = os.path.normpath(os.path.join(folder, file_title))
         candidate_file_path = base_file_path
 
         # compare to files with the same title, if it's new, keep it with an
         # appropriate name
         found = False
         i = 1
-        while candidate_file_path.exists() and not found:
+        while os.path.exists(candidate_file_path) and not found:
             if filecmp.cmp(candidate_file_path, temp_file_path, shallow=False):
                 logger.debug("file %s is the same as %s previously downloaded",
                              temp_file_path, candidate_file_path)
-                temp_file_path.unlink()
+                #temp_file_path.unlink()
+                os.remove(temp_file_path)
                 found = True
             else:
                 logger.debug("file %s is different from %s",
                              temp_file_path, candidate_file_path)
-                candidate_file_path = folder / \
-                    "{} {}{}".format(base_file_path.stem, i,
-                                     ''.join(base_file_path.suffixes))
+                #candidate_file_path = folder / \
+                #    "{} {}{}".format(base_file_path.stem, i,
+                #                     ''.join(base_file_path.suffixes))
+                base_file_path_pair = os.path.splitext(base_file_path)
+                candidate_file_path = os.path.normpath(os.path.join(folder, "{} {}{}".format(base_file_path_pair[0], i,''.join(base_file_path_pair[1]))))
                 i += 1
         if not found:
             new_file = True
-            temp_file_path.rename(candidate_file_path)
+            #temp_file_path.rename(candidate_file_path)
+            os.rename(temp_file_path, candidate_file_path)
             logger.debug("file %s with id %s saved as %s",
                          file_title, file_id, candidate_file_path)
     finally:
-        if temp_file_path.exists():
-            temp_file_path.unlink()
+        if os.path.exists(temp_file_path):
+            #temp_file_path.unlink()
+            os.remove(temp_file_path)
 
     return candidate_file_path, new_file
 
