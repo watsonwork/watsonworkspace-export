@@ -105,7 +105,9 @@ class Query:
             logger.debug("POST %s\n%s\n%s", constants.GRAPHQL_URL, request, params)
         else:
             logger.debug("POST %s\n%s", constants.GRAPHQL_URL, request)
-        response = requests.post(constants.GRAPHQL_URL, data=request, params=params,
+        response = requests.post(constants.GRAPHQL_URL,
+                                 data=request.encode(constants.REQUEST_ENCODING),
+                                 params=params,
                                  headers=self.__graphql_headers(auth_token))
         if response.status_code == 401:
             raise UnauthorizedRequestError()

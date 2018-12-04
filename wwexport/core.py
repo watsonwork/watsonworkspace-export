@@ -43,7 +43,7 @@ ResumePoint = namedtuple('ResumePoint', ['last_time', 'last_id'])
 
 
 def export_space_members(space_id: str, filename: str, auth_token: auth.AuthToken) -> list:
-    with open(filename, "w+") as space_members_file:
+    with open(filename, "w+", newline='', encoding=constants.FILE_ENCODING) as space_members_file:
         space_members_writer = csv.writer(space_members_file)
         space_members = []
         after = None
@@ -87,12 +87,12 @@ def export_space_files(space_id: str, folder: PurePath, auth_token: str, fetch_a
     file_graphqlitem_by_id = {}
     file_entries_file_path = folder / constants.FILES_META_FOLDER / constants.FILE_ENTRIES_FILE_NAME
     if (file_entries_file_path).exists():
-        with open(file_entries_file_path, "r") as f:
+        with open(file_entries_file_path, "r", encoding=constants.FILE_ENCODING) as f:
             file_graphqlitem_by_id = json.load(f)
     file_path_by_id = {}
     file_paths_file_path = folder / constants.FILES_META_FOLDER / constants.FILE_PATHS_FILE_NAME
     if (file_paths_file_path).exists():
-        with open(file_paths_file_path, "r") as f:
+        with open(file_paths_file_path, "r", encoding=constants.FILE_ENCODING) as f:
             file_path_by_id = json.load(f)
 
     downloaded = 0
@@ -160,11 +160,11 @@ def export_space_files(space_id: str, folder: PurePath, auth_token: str, fetch_a
         # if we have some metadata, write it
         if len(file_graphqlitem_by_id) > 0:
             file_entries_file_path.parent.mkdir(exist_ok=True, parents=True)
-            with open(file_entries_file_path, "w+") as f:
+            with open(file_entries_file_path, "w+", encoding=constants.FILE_ENCODING) as f:
                 json.dump(file_graphqlitem_by_id, f)
         if len(file_path_by_id) > 0:
             file_paths_file_path.parent.mkdir(exist_ok=True, parents=True)
-            with open(file_paths_file_path, "w+") as f:
+            with open(file_paths_file_path, "w+", encoding=constants.FILE_ENCODING) as f:
                 json.dump(file_path_by_id, f)
 
     logger.info("Downloaded %s files, %s files were skipped because they were downloaded according to meta files, %s downloaded files were duplicates of files already downloaded",
@@ -211,7 +211,7 @@ def find_messages_resume_point(space_export_root) -> ResumePoint:
             path = get_messages_path(space_export_root, year, month)
             if path.exists():
                 logger.debug("Found possible resume point in %s", path)
-                with open(path, "r") as space_messages_file:
+                with open(path, "r", newline='', encoding=constants.FILE_ENCODING) as space_messages_file:
                     space_messages_reader = csv.reader(space_messages_file)
                     last_message_time = None
                     for line in space_messages_reader:
@@ -366,7 +366,7 @@ def export_space(space: dict, auth_token: str, export_root_folder: PurePath, fil
                             exist_ok=True, parents=True)
 
                         resuming_file = new_messages_path.exists()
-                        space_messages_file = open(new_messages_path, "a")
+                        space_messages_file = open(new_messages_path, "a", newline='', encoding=constants.FILE_ENCODING)
                         current_messages_path = new_messages_path
 
                         space_messages_writer = csv.writer(space_messages_file)

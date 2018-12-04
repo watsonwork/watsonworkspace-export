@@ -15,6 +15,7 @@
 import core
 import queries
 import auth
+import constants
 
 import requests
 import sys
@@ -137,13 +138,13 @@ def main(argv):
         else:
             if args.type == SpaceType.spaces or args.type == SpaceType.all:
                 spaces = queries.team_spaces.all_pages(auth_token)
-                with open(export_root / "spaces.json", "w+") as f:
+                with open(export_root / "spaces.json", "w+", encoding=constants.FILE_ENCODING) as f:
                     json.dump(spaces, f)
                 spaces_to_export.extend(spaces)
 
             if args.type == SpaceType.dms or args.type == SpaceType.all:
                 dm_spaces = queries.dm_spaces.all_pages(auth_token)
-                with open(export_root / "dms.json", "w+") as f:
+                with open(export_root / "dms.json", "w+", encoding=constants.FILE_ENCODING) as f:
                     json.dump(dm_spaces, f)
                 spaces_to_export.extend(dm_spaces)
 
