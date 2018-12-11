@@ -15,6 +15,7 @@
 import core
 import queries
 import auth
+import constants
 
 import requests
 import sys
@@ -26,7 +27,7 @@ import logging.handlers
 from enum import Enum
 from pathlib import Path
 
-export_root = Path.home() / "Watson Workspace Export"
+default_export_root = Path.home() / "Watson Workspace Export"
 debug_file_name = "debug.log"
 error_file_name = "errors.log"
 
@@ -55,8 +56,10 @@ class LogLevel(Enum):
 def main(argv):
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        description="Export utility for Watson Workspace. This utility will create a directory at `{}` to export to.".format(export_root),
+        description="Export utility for Watson Workspace.",
         epilog="For example, to export spaces without files, run `python wwexport`. To export spaces with files, run `python wwexport --files=ALL`. To export all spaces and DMs with all files, run `python wwexport --type=ALL --files=ALL`. Always check the {} file in your export directory. Source at https://github.com/watsonwork/watsonworkspace-export".format(error_file_name))
+
+    parser.add_argument("--dir", default=default_export_root, help="Directory to export to. This directory will be created if it doesn't exist.")
 
     auth_group = parser.add_mutually_exclusive_group()
 
@@ -82,6 +85,7 @@ def main(argv):
 
     args = parser.parse_args()
 
+    export_root = Path(args.dir)
     export_root.mkdir(exist_ok=True, parents=True)
 
     logger = logging.getLogger("wwexport")
@@ -137,13 +141,13 @@ def main(argv):
         else:
             if args.type == SpaceType.spaces or args.type == SpaceType.all:
                 spaces = queries.team_spaces.all_pages(auth_token)
-                with open(export_root / "spaces.json", "w+") as f:
+                with open(export_root / "spaces.json", "w+", encoding=constants.FILE_ENCODING) as f:
                     json.dump(spaces, f)
                 spaces_to_export.extend(spaces)
 
             if args.type == SpaceType.dms or args.type == SpaceType.all:
                 dm_spaces = queries.dm_spaces.all_pages(auth_token)
-                with open(export_root / "dms.json", "w+") as f:
+                with open(export_root / "dms.json", "w+", encoding=constants.FILE_ENCODING) as f:
                     json.dump(dm_spaces, f)
                 spaces_to_export.extend(dm_spaces)
 
