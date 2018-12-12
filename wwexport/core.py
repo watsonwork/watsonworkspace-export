@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import queries
-import auth
+from wwexport import queries
+from wwexport import auth
+from wwexport import constants
 
-import constants
 import logging
 import csv
 import datetime
