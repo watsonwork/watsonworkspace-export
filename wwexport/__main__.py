@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import core
-import queries
-import auth
-import constants
+from wwexport import core
+from wwexport import queries
+from wwexport import auth
+from wwexport import constants
 
 import requests
 import sys
