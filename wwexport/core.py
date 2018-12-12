@@ -172,7 +172,7 @@ def export_space_files(space_id: str, folder: PurePath, auth_token: str, fetch_a
     return downloaded
 
 
-def write_message(message: str, writer: csv.DictWriter) -> None:
+def write_message_to_csv(message: str, writer: csv.DictWriter) -> None:
     # if there isn't content, pull it from the annotation if there is one
     if message["content"] is None:
         if message["typedAnnotations"] is not None and len(message["typedAnnotations"]) > 0:
@@ -202,7 +202,7 @@ def write_message(message: str, writer: csv.DictWriter) -> None:
 
 
 def get_messages_path(space_export_root: str, year: int, month: int) -> str:
-    return space_export_root / str(year) / constants.MESSAGES_FILE_NAME_PATTERN.format(month)
+    return space_export_root / constants.MESSAGES_FILE_NAME_PATTERN.format(year=year, month=month)
 
 
 def find_messages_resume_point(space_export_root) -> ResumePoint:
@@ -380,7 +380,7 @@ def export_space(space: dict, auth_token: str, export_root_folder: PurePath, fil
                                 space_messages_writer.writerow(
                                     ["message id", "author name", "author id", "created date", "content"])
 
-                    write_message(message, space_messages_writer)
+                    write_message_to_csv(message, space_messages_writer)
                 else:
                     logger.debug(
                         "Skipping message with ID %s. This may just mean this message was on a prior page. This should normally happen exactly once per page, other than the first page, which it should not occur.", message["id"])
