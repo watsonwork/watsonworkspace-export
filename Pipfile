@@ -6,6 +6,7 @@ name = "pypi"
 [packages]
 requests = "*"
 python-dateutil = "*"
+tqdm = "*"
 
 [dev-packages]
 
