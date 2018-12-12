@@ -17,7 +17,7 @@ import datetime
 REQUEST_ENCODING = "UTF-8"
 FILE_ENCODING = "UTF-8"
 
-MESSAGES_FILE_NAME_PATTERN = "messages {}.csv"
+MESSAGES_FILE_NAME_PATTERN = "{year}.{month} messages.csv"
 FILES_META_FOLDER = "_meta"
 FILE_ENTRIES_FILE_NAME = "entries.json"
 FILE_PATHS_FILE_NAME = "paths.json"
