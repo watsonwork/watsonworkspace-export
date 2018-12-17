@@ -6,6 +6,10 @@ name = "pypi"
 [packages]
 requests = "*"
 python-dateutil = "*"
+pandas = "*"
+"jinja2" = "*"
+babel = "*"
+mistletoe = "*"
 tqdm = "*"
 
 [dev-packages]
