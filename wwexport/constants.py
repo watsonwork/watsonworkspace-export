@@ -28,7 +28,6 @@ JWT_TOKEN_REFRESH_BUFFER = datetime.timedelta(seconds=60)
 
 GRAPHQL_URL = "https://api.watsonwork.ibm.com/graphql"
 GRAPHQL_VIEWS = "DIRECT_MESSAGING,RESOURCE,TYPED_ANNOTATIONS,EXPERIMENTAL,PUBLIC"
-GRAPHQL_PAGE_SIZE = 200
 
 FILE_DOWNLOAD_URL_FORMAT = "https://api.watsonwork.ibm.com/files/api/v1/files/file/{}/content/noredirect"
 

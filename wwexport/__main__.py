@@ -80,8 +80,6 @@ def main(argv):
     parser.add_argument("--annotations", action="store_true", help="Incude this option to write all annotations in the message files. Even without this option, the content of a generic annotation will be exported if there is no other message content.")
 
     logging_group = parser.add_argument_group("logging")
-    # logging_group.add_argument(
-    #    "--consolelevel", type=LogLevel, default=LogLevel.none, choices=list(LogLevel), help="Console log level")
     logging_group.add_argument(
         "--loglevel", type=LogLevel, default=LogLevel.info, choices=list(LogLevel), help="Messages of this type will be printed to a {} file in the export directory. Regardless, errors and warnings are ALWAYS printed to a separate {}.".format(debug_file_name, error_file_name))
 
@@ -112,10 +110,6 @@ def main(argv):
         file_log_handler.setFormatter(default_formatter)
         file_log_handler.setLevel(str(args.loglevel))
         logger.addHandler(file_log_handler)
-
-    # console_log_handler = logging.StreamHandler(stream=sys.stderr)
-    # console_log_handler.setLevel(str(args.consolelevel))
-    # logger.addHandler(console_log_handler)
 
     # auth
     auth_token = None
