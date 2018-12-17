@@ -27,6 +27,8 @@ import logging.handlers
 from enum import Enum
 from pathlib import Path
 
+from tqdm import tqdm
+
 default_export_root = Path.home() / "Watson Workspace Export"
 debug_file_name = "debug.log"
 error_file_name = "errors.log"
@@ -79,9 +81,7 @@ def main(argv):
 
     logging_group = parser.add_argument_group("logging")
     logging_group.add_argument(
-        "--consolelevel", type=LogLevel, default=LogLevel.info, choices=list(LogLevel), help="Console log level")
-    logging_group.add_argument(
-        "--loglevel", type=LogLevel, default=LogLevel.none, choices=list(LogLevel), help="Messages of this type will be printed to a {} file in the export directory. Regardless, errors and warnings are ALWAYS printed to a separate {}.".format(debug_file_name, error_file_name))
+        "--loglevel", type=LogLevel, default=LogLevel.info, choices=list(LogLevel), help="Messages of this type will be printed to a {} file in the export directory. Regardless, errors and warnings are ALWAYS printed to a separate {}.".format(debug_file_name, error_file_name))
 
     args = parser.parse_args()
 
@@ -110,10 +110,6 @@ def main(argv):
         file_log_handler.setFormatter(default_formatter)
         file_log_handler.setLevel(str(args.loglevel))
         logger.addHandler(file_log_handler)
-
-    console_log_handler = logging.StreamHandler(stream=sys.stderr)
-    console_log_handler.setLevel(str(args.consolelevel))
-    logger.addHandler(console_log_handler)
 
     # auth
     auth_token = None
@@ -151,7 +147,7 @@ def main(argv):
                     json.dump(dm_spaces, f)
                 spaces_to_export.extend(dm_spaces)
 
-        for space in spaces_to_export:
+        for space in tqdm(spaces_to_export, desc="Export Spaces", position=0, unit="space", dynamic_ncols=True):
             core.export_space(space, auth_token, export_root, args.files, export_annotations=args.annotations)
 
     except queries.UnauthorizedRequestError:

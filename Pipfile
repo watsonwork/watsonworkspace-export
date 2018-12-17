@@ -10,6 +10,7 @@ pandas = "*"
 "jinja2" = "*"
 babel = "*"
 mistletoe = "*"
+tqdm = "*"
 
 [dev-packages]
 

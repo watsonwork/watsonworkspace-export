@@ -26,6 +26,8 @@ from dateutil.parser import parse
 from collections import namedtuple
 from enum import Enum
 
+from tqdm import tqdm
+
 logger = logging.getLogger("wwexport")
 __current_user = None
 
@@ -42,24 +44,30 @@ class FileOptions(Enum):
 ResumePoint = namedtuple('ResumePoint', ['last_time', 'last_id'])
 
 
-def export_space_members(space_id: str, filename: str, auth_token: auth.AuthToken) -> list:
+def export_space_members(space_id: str, space_display_name: str, filename: str, auth_token: auth.AuthToken) -> list:
     with open(filename, "w+", newline='', encoding=constants.FILE_ENCODING) as space_members_file:
         space_members_writer = csv.writer(space_members_file)
         space_members = []
         after = None
         space_members_writer.writerow(["name", "email", "id"])
-        while True:
-            space_members_page = queries.space_members.execute(auth_token, spaceid=space_id, after=after)
-            for member in space_members_page["items"]:
-                space_members_writer.writerow(
-                    [member["displayName"], member["email"], member["id"]])
+        # force tqdm to clear the previous counter's output
+        tqdm.write("")
+        with tqdm(desc="{} members".format(space_display_name), position=1, unit=" member batch", initial=1, dynamic_ncols=True) as member_progress:
+            while True:
+                space_members_page = queries.space_members.execute(auth_token, spaceid=space_id, after=after)
+                for member in space_members_page["items"]:
+                    space_members_writer.writerow(
+                        [member["displayName"], member["email"], member["id"]])
 
-            space_members.extend(space_members_page["items"])
+                space_members.extend(space_members_page["items"])
 
-            if (space_members_page["pageInfo"]["hasNextPage"]):
-                after = space_members_page["pageInfo"]["endCursor"]
-            else:
-                break
+                if (space_members_page["pageInfo"]["hasNextPage"]):
+                    after = space_members_page["pageInfo"]["endCursor"]
+                else:
+                    break
+                member_progress.clear()
+                member_progress.update()
+
         logger.info("Printed %s members to %s", len(space_members), filename)
     return space_members
 
@@ -246,37 +254,42 @@ def get_DM_participant(space: dict, auth_token: str) -> dict:
     return dm_participant
 
 
-def get_space_folder(space: dict, root_path: PurePath, auth_token: str):
-    space_folder_name = space["id"]
+def get_space_display_name(space: dict, auth_token: str):
+    space_display_name = space["id"]
     if space["type"] == "DIRECT":
         other_participant = get_DM_participant(space, auth_token)
         if other_participant:
-            space_folder_name = root_path / "DM" / "{} - {}".format(other_participant["displayName"], other_participant["email"])
+            space_display_name = "{} - {}".format(other_participant["displayName"], other_participant["email"])
         else:
-            space_folder_name = root_path / "DM" / space["id"]
-            logger.error("space with id %s at %s like a direct messaging space, but we didn't find another member in it - we'll generate the directory name based on the user ID", space["id"], space_folder_name)
+            space_display_name = space["id"]
+            logger.error("space with id %s at %s like a direct messaging space, but we didn't find another member in it - we'll generate the display name based on the user ID", space["id"], space_display_name)
     else:
         if space["type"] != "TEAM":
             logger.warn("space with id %s has type %s - neither TEAM nor DIRECT (DM) - will treat the space as a team space", space["id"], space["type"])
         if space["title"]:
-            space_folder_name = root_path / "SPACE" / "{} {}".format(space["title"].replace("/", "-"), space["id"])
+            space_display_name = "{} {}".format(space["title"].replace("/", "-").replace("\\", "-"), space["id"])
         else:
-            space_folder_name = root_path / "SPACE" / space["id"]
-            logger.warn("space with id %s at %s lacks a title", space["id"], space_folder_name)
+            space_display_name = space["id"]
+            logger.warn("space with id %s at %s lacks a title", space["id"], space_display_name)
+    return space_display_name
 
-    return root_path / space_folder_name
+
+def get_space_folder(space_type: str, space_display_name: str, root_path: PurePath, auth_token: str):
+    type_folder = "DM" if space_type == "DIRECT" else "SPACE"
+    return root_path / type_folder / space_display_name
 
 
 def export_space(space: dict, auth_token: str, export_root_folder: PurePath, file_options: FileOptions = FileOptions.none, export_members: bool = True, export_messages: bool = True, export_annotations: bool = False) -> None:
     export_time = datetime.datetime.now()
 
-    space_export_root = get_space_folder(space, export_root_folder, auth_token)
+    space_display_name = get_space_display_name(space, auth_token)
+    space_export_root = get_space_folder(space["type"], space_display_name, export_root_folder, auth_token)
     space_export_root.mkdir(exist_ok=True, parents=True)
 
-    logger.info(">> Exporting space with ID %s to %s", space["id"], space_export_root)
+    logger.info(">> Exporting space %s to %s", space_display_name, space_export_root)
 
     if export_members:
-        export_space_members(space["id"], space_export_root / "members {}.csv".format(
+        export_space_members(space["id"], space_display_name, space_export_root / "members {}.csv".format(
             export_time.strftime("%Y-%m-%d %H.%M")), auth_token)
 
     next_page_time_in_milliseconds, last_known_id = find_messages_resume_point(
@@ -310,94 +323,97 @@ def export_space(space: dict, auth_token: str, export_root_folder: PurePath, fil
         # while there are no more pages of messages
         space_messages_file = None
         message_query = queries.space_messages_with_annotations if export_annotations else queries.space_messages
-        while export_messages or export_annotations:
-            space_messages_page = message_query.execute(auth_token, spaceid=space["id"], oldest=next_page_time_in_milliseconds)
-            if not space_messages_page:
-                if message_count == 0:
-                    if last_known_id:
-                        logger.warn(
-                            "Fetched a page with no messages for space %s, but expected at least message %s. This may be OK if the space has no new messages and this message was deleted", space["id"], last_known_id)
+        tqdm.write("")
+        with tqdm(desc="{} messages".format(space_display_name), position=1, unit=" message batch", initial=1, dynamic_ncols=True) as message_progress:
+            while export_messages or export_annotations:
+                space_messages_page = message_query.execute(auth_token, spaceid=space["id"], oldest=next_page_time_in_milliseconds)
+                if not space_messages_page:
+                    if message_count == 0:
+                        if last_known_id:
+                            logger.warn(
+                                "Fetched a page with no messages for space %s, but expected at least message %s. This may be OK if the space has no new messages and this message was deleted", space["id"], last_known_id)
+                        else:
+                            logger.info(
+                                "Fetched empty page of messages and was not resuming. Looks like space %s has no messages", space["id"])
                     else:
-                        logger.info(
-                            "Fetched empty page of messages and was not resuming. Looks like space %s has no messages", space["id"])
-                else:
-                    logger.error(
-                        "Fetched a page with no messages, but had printed previous pages. Expected at least one message on this page")
-                break
+                        logger.error(
+                            "Fetched a page with no messages, but had printed previous pages. Expected at least one message on this page")
+                    break
 
-            logger.debug("Fetched page with %s messages",
-                         len(space_messages_page))
-            space_messages_page.reverse()
+                logger.debug("Fetched page with %s messages",
+                             len(space_messages_page))
+                space_messages_page.reverse()
 
-            page_ids = set()
-            found_new_message = False
+                page_ids = set()
+                found_new_message = False
 
-            current_messages_path = None
-            for message in space_messages_page:
-                # If this message wasn't in the last page...
-                # This check is necessary since we paginate by created time of
-                # the message. Without this, we would either need to slightly
-                # increment the time, and risk losing messages, or we would
-                # print the same message twice. Why not compare just the last
-                # ID? If there is more than 1 message at this time, then there
-                # could be multiple messages overlapping. In the extreme case,
-                # an entire page overlaps and the script exits thinking it
-                # didn't find new messages, but this is extremely unlikely
-                if message["id"] not in previous_page_ids:
-                    message_count += 1
-                    found_new_message = True
-                    page_ids.add(message["id"])
+                current_messages_path = None
+                for message in space_messages_page:
+                    # If this message wasn't in the last page...
+                    # This check is necessary since we paginate by created time of
+                    # the message. Without this, we would either need to slightly
+                    # increment the time, and risk losing messages, or we would
+                    # print the same message twice. Why not compare just the last
+                    # ID? If there is more than 1 message at this time, then there
+                    # could be multiple messages overlapping. In the extreme case,
+                    # an entire page overlaps and the script exits thinking it
+                    # didn't find new messages, but this is extremely unlikely
+                    if message["id"] not in previous_page_ids:
+                        message_count += 1
+                        found_new_message = True
+                        page_ids.add(message["id"])
 
-                    created_datetime = parse(message["created"])
-                    next_page_time_in_milliseconds = int(
-                        created_datetime.timestamp() * 1000)
+                        created_datetime = parse(message["created"])
+                        next_page_time_in_milliseconds = int(
+                            created_datetime.timestamp() * 1000)
 
-                    # If necessary, tear down the old file and open a new one
-                    # for the year and month of the next message
-                    new_messages_path = get_messages_path(
-                        space_export_root, created_datetime.year, created_datetime.month)
-                    if (new_messages_path != current_messages_path):
-                        if space_messages_file and not space_messages_file.closed:
-                            logger.debug("Closing file while switching files")
-                            space_messages_file.flush()
-                            space_messages_file.close()
+                        # If necessary, tear down the old file and open a new one
+                        # for the year and month of the next message
+                        new_messages_path = get_messages_path(
+                            space_export_root, created_datetime.year, created_datetime.month)
+                        if (new_messages_path != current_messages_path):
+                            if space_messages_file and not space_messages_file.closed:
+                                logger.debug("Closing file while switching files")
+                                space_messages_file.flush()
+                                space_messages_file.close()
 
-                        new_messages_path.parent.mkdir(
-                            exist_ok=True, parents=True)
+                            new_messages_path.parent.mkdir(
+                                exist_ok=True, parents=True)
 
-                        resuming_file = new_messages_path.exists()
-                        space_messages_file = open(new_messages_path, "a", newline='', encoding=constants.FILE_ENCODING)
-                        current_messages_path = new_messages_path
+                            resuming_file = new_messages_path.exists()
+                            space_messages_file = open(new_messages_path, "a", newline='', encoding=constants.FILE_ENCODING)
+                            current_messages_path = new_messages_path
 
-                        space_messages_writer = csv.writer(space_messages_file)
-                        if not resuming_file:
-                            logger.debug(
-                                "Starting a new file. Writing header.")
-                            if export_annotations:
-                                space_messages_writer.writerow(
-                                    ["message id", "author name", "author id", "created date", "content", "annotations"])
-                            else:
-                                space_messages_writer.writerow(
-                                    ["message id", "author name", "author id", "created date", "content"])
+                            space_messages_writer = csv.writer(space_messages_file)
+                            if not resuming_file:
+                                logger.debug(
+                                    "Starting a new file. Writing header.")
+                                if export_annotations:
+                                    space_messages_writer.writerow(
+                                        ["message id", "author name", "author id", "created date", "content", "annotations"])
+                                else:
+                                    space_messages_writer.writerow(
+                                        ["message id", "author name", "author id", "created date", "content"])
 
-                    write_message_to_csv(message, space_messages_writer)
-                else:
-                    logger.debug(
-                        "Skipping message with ID %s. This may just mean this message was on a prior page. This should normally happen exactly once per page, other than the first page, which it should not occur.", message["id"])
-            previous_page_ids = page_ids
-            if not found_new_message:
-                # There is potentially a case we could get here in error, if
-                # there were more messages with a specific timestamp than our
-                # paging would allow - getting us stuck on the time. We could
-                # try to detect this, but it's probably not going to happen with
-                # any space.
-                if message:
-                    logger.info("Printed %s messages for space %s. The last known message was %s.",
-                                message_count, space["id"], message["id"])
-                else:
-                    logger.info("Printed %s messages for space %s.",
-                                message_count, space["id"])
-                break
+                        write_message_to_csv(message, space_messages_writer)
+                    else:
+                        logger.debug(
+                            "Skipping message with ID %s. This may just mean this message was on a prior page. This should normally happen exactly once per page, other than the first page, which it should not occur.", message["id"])
+                previous_page_ids = page_ids
+                if not found_new_message:
+                    # There is potentially a case we could get here in error, if
+                    # there were more messages with a specific timestamp than our
+                    # paging would allow - getting us stuck on the time. We could
+                    # try to detect this, but it's probably not going to happen with
+                    # any space.
+                    if message:
+                        logger.info("Printed %s messages for space %s. The last known message was %s.",
+                                    message_count, space["id"], message["id"])
+                    else:
+                        logger.info("Printed %s messages for space %s.",
+                                    message_count, space["id"])
+                    break
+                message_progress.update()
 
     finally:
         if space_messages_file is not None and not space_messages_file.closed:
