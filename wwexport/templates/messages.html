@@ -1,0 +1,60 @@
+{# Copyright 2018 IBM
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#}<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Messages for {{ monthyear }}</title>
+    <link rel="stylesheet" type="text/css" href="../../styles.css" />
+</head>
+<body>
+    {% set ns = namespace(last_message_created_date=None, message_created=None) %}
+    {% for key,message in df.iterrows() %}
+      {% set ns.message_created = message["created date"] | parse_datetime %}
+      {% if ns.last_message_created_date == None or ns.message_created.date() != ns.last_message_created_date %}
+      <hr/>
+      <div class="ic-message-date" title="{{ ns.message_created|format_date }}" >{{ ns.message_created|format_date(format="full") }}</div>
+      <hr/>
+      {% endif %}
+      <div class="ic-transcript-item">
+        <div id="{{ message["message id"] }}" class="ic-message">
+          <div class="ic-avatar-message">
+            <div class="ic-message-data">
+              <div class="ic-message-meta">
+                <div tabindex="0" class="ic-person ic-person-with-card">{{ message["author name"]|name_case }}</div>
+                <span title="{{ ns.message_created|format_datetime }}" class="ic-timestamp">{{ ns.message_created|format_datetime }}</span>
+              </div>
+              <div class="ic-general-annotation ic-single-message-rendering">
+                <div class="ic-annotation-border" style="display: none;"></div>
+                <div class="ic-annotation-content">
+                  <div class="ic-message-text">
+                    <div class="ic-markdown-para">
+                      <span class="ic-markdown-para-content">
+                        <span class="ic-markdown-content-wrapper">
+                          <span class="ic-message-container">
+                            <span>{{ message["content"] | md | safe }}</span>
+                          </span>
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% set ns.last_message_created_date = ns.message_created.date() %}
+    {% endfor %}
+</body>
+</html>
