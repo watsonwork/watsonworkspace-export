@@ -16,7 +16,11 @@ from wwexport import core
 from wwexport import queries
 from wwexport import auth
 from wwexport import constants
+from wwexport import ww_html
 
+import hashlib
+import shutil
+import fnmatch
 import requests
 import sys
 import argparse
@@ -55,7 +59,12 @@ class LogLevel(Enum):
         return self.value
 
 
+def is_message_file(path: Path) -> bool:
+    return fnmatch.fnmatch(path.name, "* messages.csv")
+
+
 def main(argv):
+    error = False
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         description="Export utility for Watson Workspace.",
@@ -77,7 +86,9 @@ def main(argv):
 
     parser.add_argument("--files", type=core.FileOptions, choices=list(core.FileOptions), default=core.FileOptions.none, help="Specify how files will be exported, if at all. RESUME will only look at files since the most recently downloaded message. RESUME is useful if you have previously downloaded all files and just want to get any new content. ALL will page through metadata for all files to make sure older files are downloaded. Both options use a local metadata file to skip unnecessary downloads, and both options deduplicate among files in the space with the same name after downloading. You shouldn't have to worry about duplicate files, even if you use the ALL option multiple times. RESUME will be faster, but only use it if you are sure you have all files up to the latest local file already downloaded. If you are unsure, or this is the first time you are downloading files, ALL is suggested.")
 
-    parser.add_argument("--annotations", action="store_true", help="Incude this option to write all annotations in the message files. Even without this option, the content of a generic annotation will be exported if there is no other message content.")
+    parser.add_argument("--html", action="store_true", help="For all spaces touched by the export, generate HTML versions. This will regenerate HTML for all messages of the spaces affected, not just new messages.")
+
+    parser.add_argument("--annotations", action="store_true", help="Write all annotations in the message files. Even without this option, the content of a generic annotation will be exported if there is no other message content.")
 
     logging_group = parser.add_argument_group("logging")
     logging_group.add_argument(
@@ -130,6 +141,15 @@ def main(argv):
 
     logger.info("Starting export")
 
+    if args.html:
+        styles_src = Path(__file__).parent / "resources/styles.css"
+        with open(styles_src, "rb") as styles_file:
+            m = hashlib.md5()
+            m.update(styles_file.read())
+            md5 = m.hexdigest()
+            styles_destination = "styles_{}.css".format(md5)
+            shutil.copy(styles_src, export_root / styles_destination)
+
     try:
         spaces_to_export = []
         if args.spaceid:
@@ -148,26 +168,37 @@ def main(argv):
                 spaces_to_export.extend(dm_spaces)
 
         for space in tqdm(spaces_to_export, desc="Export Spaces", position=0, unit="space", dynamic_ncols=True):
-            core.export_space(space, auth_token, export_root, args.files, export_annotations=args.annotations)
+            space_root, space_display_name = core.export_space(space, auth_token, export_root, args.files, export_annotations=args.annotations)
+            if args.html:
+                for file in tqdm(filter(is_message_file, space_root.iterdir()), desc="{} HTML generation".format(space_display_name), position=1, dynamic_ncols=True, unit=" HTML files", initial=1):
+                    try:
+                        ww_html.csv_to_html(file, styles=styles_destination)
+                    except Exception:
+                        logger.exception("An error occured while generating HTML for %s", file)
 
     except queries.UnauthorizedRequestError:
-        logger.error("Export incomplete. Looks like your JWT might have timed out or is invalid. Good thing this is resumable. Go get a new one and run this again. We'll pick up from where we left off (more or less).")
-        sys.exit(1)
+        msg = "Export incomplete. Looks like your JWT might have timed out or is invalid. Good thing this is resumable. Go get a new one and run this again. We'll pick up from where we left off (more or less)."
+        tqdm.write(msg)
+        logger.error(msg)
     except queries.UnknownRequestError as err:
         logger.exception(
             "Export incomplete. Aborting with HTTP status code %s with response %s. If problem persists, run with a debug enabled and check the prior request. You may also run the export space by space.", err.status_code, err.text)
-        sys.exit(1)
+        error = True
     except queries.GraphQLError:
         logger.exception("Export incomplete. Terminating with GraphQLError. If problem persists, run with a debug enabled and check the prior request. You may also run the export space by space.")
-        sys.exit(1)
+        error = True
     except requests.exceptions.ConnectionError:
         logger.exception("Export incomplete. Connection was interrupted. Restart the export and it will resume where you left off (for the most part)")
-        sys.exit(1)
+        error = True
     except auth.UnauthorizedRequestError:
         logger.exception("Export incomplete. Unable to authenticate or reauthenticate.")
-        sys.exit(1)
+        error = True
     except Exception:
         logger.exception("Export incomplete. Unknown error.")
+        error = True
+
+    if error:
+        tqdm.write("An error prevented some part of the export. Check the {} and {} files in your export directory for more information.".format(debug_file_name, error_file_name))
         sys.exit(1)
     else:
         logger.info("Completed export")

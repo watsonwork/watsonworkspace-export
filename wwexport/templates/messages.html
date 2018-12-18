@@ -14,10 +14,11 @@
 #}<!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Messages for {{ monthyear }}</title>
-    <link rel="stylesheet" type="text/css" href="../../styles.css" />
+    <title>Messages for {{ month_year }}</title>
+    <link rel="stylesheet" type="text/css" href="../../{{styles}}" />
 </head>
 <body>
+    <div class="ww-export-header">This file was generated on {{ export_date|format_datetime }}</div>
     {% set ns = namespace(last_message_created_date=None, message_created=None) %}
     {% for key,message in df.iterrows() %}
       {% set ns.message_created = message["created date"] | parse_datetime %}

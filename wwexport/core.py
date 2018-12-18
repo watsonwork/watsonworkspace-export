@@ -279,7 +279,7 @@ def get_space_folder(space_type: str, space_display_name: str, root_path: PurePa
     return root_path / type_folder / space_display_name
 
 
-def export_space(space: dict, auth_token: str, export_root_folder: PurePath, file_options: FileOptions = FileOptions.none, export_members: bool = True, export_messages: bool = True, export_annotations: bool = False) -> None:
+def export_space(space: dict, auth_token: str, export_root_folder: PurePath, file_options: FileOptions = FileOptions.none, export_members: bool = True, export_messages: bool = True, export_annotations: bool = False) -> (Path, str):
     export_time = datetime.datetime.now()
 
     space_display_name = get_space_display_name(space, auth_token)
@@ -420,3 +420,7 @@ def export_space(space: dict, auth_token: str, export_root_folder: PurePath, fil
             logger.debug("Closing file at end of space export")
             space_messages_file.flush()
             space_messages_file.close()
+
+    tqdm.write("")
+
+    return space_export_root, space_display_name

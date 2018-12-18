@@ -14,18 +14,24 @@
 
 from wwexport import constants
 
+import logging
+import datetime
 import re
 import sys
 import argparse
 import dateutil
 from pathlib import Path
 
+import bleach
 from mistletoe import Document, html_renderer
 from mistletoe.span_token import SpanToken
 import pandas as pd
 from babel.dates import format_date, format_datetime, format_time
 
 from jinja2 import Environment, PackageLoader, select_autoescape
+
+logger = logging.getLogger("wwexport")
+allowed_tags = ["p", "img"] + bleach.sanitizer.ALLOWED_TAGS
 
 
 class WWMentionSpan(SpanToken):
@@ -66,27 +72,40 @@ jinja_env = Environment(
 
 
 def _jinja_filter_name_case(val: str):
-    return val.title() if val.islower() or val.isupper() else val
+    return val.title() if val is not None and (val.islower() or val.isupper()) else val
 
 
 def _jinja_filter_md(val: str):
     with WWHTMLRenderer() as renderer:
-        return renderer.render(Document(val))
+        return bleach.clean(
+            renderer.render(
+                Document(val)
+            ),
+            tags=allowed_tags,
+        )
 
 
-jinja_env.filters['format_date'] = format_date
-jinja_env.filters['format_datetime'] = format_datetime
-jinja_env.filters['format_time'] = format_time
-jinja_env.filters['parse_datetime'] = dateutil.parser.parse
-jinja_env.filters['name_case'] = _jinja_filter_name_case
-jinja_env.filters['md'] = _jinja_filter_md
+jinja_env.filters["format_date"] = format_date
+jinja_env.filters["format_datetime"] = format_datetime
+jinja_env.filters["format_time"] = format_time
+jinja_env.filters["parse_datetime"] = dateutil.parser.parse
+jinja_env.filters["name_case"] = _jinja_filter_name_case
+jinja_env.filters["md"] = _jinja_filter_md
 
 
-def csv_to_html(file: Path):
+def csv_to_html(file: Path, styles: str = "styles.css"):
+    logger.info("Converting %s to HTML", file)
     df = pd.read_csv(file, encoding=constants.FILE_ENCODING)
-    template = jinja_env.get_template('messages.html')
+    template = jinja_env.get_template("messages.html")
     with open(file.with_suffix(".html"), "w+") as html_file:
-        html_file.write(template.render(df=df, monthyear="201811"))
+        html_file.write(
+            template.render(
+                df=df,
+                month_year="201811",
+                export_date=datetime.datetime.now(),
+                styles=styles,
+            )
+        )
 
 
 def main(argv):
