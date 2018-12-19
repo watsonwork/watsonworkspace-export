@@ -33,3 +33,5 @@ FILE_DOWNLOAD_URL_FORMAT = "https://api.watsonwork.ibm.com/files/api/v1/files/fi
 
 MIN_GRAPHQL_INTERVAL = datetime.timedelta(seconds=2)
 FILE_DOWNLOAD_WAIT = 2  # seconds
+
+FILE_NAME_TRANSLATION_TABLE = str.maketrans("/\\<>|", "-----", ":\"?*")
