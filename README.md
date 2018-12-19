@@ -30,8 +30,8 @@ Due to the possible expiration of the JWT auth token, and potential for other is
 1. Change to the directory containing this project
 2. Obtain an app ID and secret from https://developer.watsonwork.ibm.com/apps
 3. Add the app to spaces to be exported
-4. Run `python wwexport --appcred APP_ID:APP_SECRET --spaceid SPACE_TO_EXPORT`
+4. Run `python -m wwexport --appcred APP_ID:APP_SECRET --spaceid SPACE_TO_EXPORT`
 
-Run `python wwexport -h` for more options, including options on exporting files.
+Run `python -m wwexport -h` for more options, including options on exporting files.
 
 When files are exported, additional metadata files are created to save information about file creators, dates, and the relationship of file IDs to paths on the local file system. This aids when resuming an export since the tool uses the metadata files to skips downloads of files already downloaded. Unless IDs were used as file names (which is not very user friendly), it is otherwise not possible to know which files were downloaded without meta files, since multiple files can have the same name in a space. These meta files are also helpful in knowing information on the message associated with a file, or finding the file corresponding to a message.
