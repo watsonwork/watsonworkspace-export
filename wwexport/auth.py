@@ -82,16 +82,17 @@ class AppAuthToken(AuthToken):
 
         request = urllib.Request(constants.OAUTH_URL, data=data, headers=constants.OAUTH_REQUEST_HEADERS)
 
-        with urllib.request.urlopen(request) as response:
-            if response.getcode() != 200:
-                logger.critical("Tried to authenticate an app, got error code %s with response %s", response.status_code, response.json())
-                raise UnauthorizedRequestError()
-            self.full_response = json.loads(response.read())
-            self.jwt = self.full_response["access_token"]
-            self.expires_in_secs = datetime.timedelta(seconds=self.full_response["expires_in"])
-            self.expiry_time = self.request_time + self.expires_in_secs - constants.JWT_TOKEN_REFRESH_BUFFER
-            logger.log(5, "refreshed auth token at %s - token will expire in %s, with a buffer next refresh will be at %s", self.request_time, self.expires_in_secs, self.expiry_time)
-            return self.full_response
+        try:
+            with urllib.request.urlopen(request) as response:
+                self.full_response = json.loads(response.read())
+                self.jwt = self.full_response["access_token"]
+                self.expires_in_secs = datetime.timedelta(seconds=self.full_response["expires_in"])
+                self.expiry_time = self.request_time + self.expires_in_secs - constants.JWT_TOKEN_REFRESH_BUFFER
+                logger.log(5, "refreshed auth token at %s - token will expire in %s, with a buffer next refresh will be at %s", self.request_time, self.expires_in_secs, self.expiry_time)
+                return self.full_response
+        except urllib.error.HTTPError as err:
+            logger.critical("Tried to authenticate an app, got error code %s with reason %s", err.code, err.reason)
+            raise UnauthorizedRequestError()
 
     def jwt_token(self):
         refresh_needed = self.request_time is None or self.expires_in_secs is None or datetime.datetime.now() > self.expiry_time

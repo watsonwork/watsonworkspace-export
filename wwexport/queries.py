@@ -39,8 +39,9 @@ class UnauthorizedRequestError(RequestError):
 class UnknownRequestError(RequestError):
     """Something else went wrong."""
 
-    def __init__(self, response):
-        self.status_code = response.getcode()
+    def __init__(self, err):
+        self.status_code = err.code
+        self.reason = err.reason
 
 
 class GraphQLError(RequestError):
@@ -100,20 +101,19 @@ class Query:
                 time.sleep(wait)
 
         type(self).__last_graphql_request_time = now
-        if params:
-            url = constants.GRAPHQL_URL + "?" + urllib.parse.urlencode(params)
-        else:
-            url = constants.GRAPHQL_URL
+        url = constants.GRAPHQL_URL + "?" + urllib.parse.urlencode(params) if params else constants.GRAPHQL_URL
         logger.debug("POST %s\n%s", url, graphql_request)
         request = urllib.request.Request(url,
                                          data=graphql_request.encode(constants.REQUEST_ENCODING),
                                          headers=self.__graphql_headers(auth_token))
-        with urllib.request.urlopen(request) as response:
-            if response.getcode() == 401:
+        try:
+            with urllib.request.urlopen(request) as response:
+                return json.loads(response.read())
+        except urllib.error.HTTPError as err:
+            if err.code == 401:
                 raise UnauthorizedRequestError()
-            elif response.getcode() != 200:
-                raise UnknownRequestError(response)
-            return json.loads(response.read())
+            else:
+                raise UnknownRequestError(err)
 
     def execute(self, auth_token: auth.AuthToken, **kwargs: dict):
         params = {'variables': json.dumps(kwargs)} if kwargs is not None else {}
@@ -202,19 +202,23 @@ def download(file_id: str, file_title: str, folder: PurePath, auth_token: str):
 
     request = urllib.request.Request(download_url,
                                      headers=__download_headers(auth_token))
-    with urllib.request.urlopen(request) as response:
-        if response.getcode() == 401:
+    try:
+        with urllib.request.urlopen(request) as response:
+            if response.getcode() == 401:
+                raise UnauthorizedRequestError()
+            elif response.getcode() == 204:
+                content_location = response.headers["x-content-location"]
+                redirected_request = urllib.request.Request(content_location,
+                                                            headers=__download_headers(auth_token))
+                with urllib.request.urlopen(redirected_request) as redirected_response:
+                    return __handle_download(redirected_response, file_id, file_title, folder)
+            else:
+                return __handle_download(response, file_id, file_title, folder)
+    except urllib.error.HTTPError as err:
+        if err.code == 401:
             raise UnauthorizedRequestError()
-        elif response.getcode() == 204:
-            content_location = response.headers["x-content-location"]
-            redirected_request = urllib.request.Request(content_location,
-                                                        headers=__download_headers(auth_token))
-            with urllib.request.urlopen(redirected_request) as redirected_response:
-                return __handle_download(redirected_response, file_id, file_title, folder)
-        elif response.getcode() != 200:
-            raise UnknownRequestError(response)
         else:
-            return __handle_download(response, file_id, file_title, folder)
+            raise UnknownRequestError(err)
 
 
 dm_spaces = Query("DM Spaces", """query getDMSpaces($after: String) {

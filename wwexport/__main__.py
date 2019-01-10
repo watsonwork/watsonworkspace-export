@@ -178,11 +178,11 @@ def main(argv):
 
     except queries.UnauthorizedRequestError:
         msg = "Export incomplete. Looks like your JWT might have timed out or is invalid. Good thing this is resumable. Go get a new one and run this again. We'll pick up from where we left off (more or less)."
-        tqdm.write(msg)
+        print(msg)
         logger.error(msg)
     except queries.UnknownRequestError as err:
         logger.exception(
-            "Export incomplete. Aborting with HTTP status code %s. If problem persists, run with a debug enabled and check the prior request. You may also run the export space by space.", err.status_code)
+            "Export incomplete. Aborting with HTTP status code %s and reason %s. If problem persists, run with a debug enabled and check the prior request. You may also run the export space by space.", err.status_code, err.reason)
         error = True
     except queries.GraphQLError:
         logger.exception("Export incomplete. Terminating with GraphQLError. If problem persists, run with a debug enabled and check the prior request. You may also run the export space by space.")
@@ -198,10 +198,14 @@ def main(argv):
         error = True
 
     if error:
-        tqdm.write("An error prevented some part of the export. Check the {} and {} files in your export directory for more information.".format(debug_file_name, error_file_name))
+        msg = "An error prevented some part of the export. Check the {} and {} files in your export directory for more information.".format(debug_file_name, error_file_name)
+        logger.critical(msg)
+        print(msg)
         sys.exit(1)
     else:
-        logger.info("Completed export")
+        msg = "Completed export"
+        logger.info(msg)
+        print(msg)
         sys.exit(0)
 
 
