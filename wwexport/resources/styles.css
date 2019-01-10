@@ -24,9 +24,14 @@ body {
   font-weight: 200;
 }
 
+.ic-message-container p {
+  margin: 0;
+}
+
 .ic-transcript-item {
   color: rgb(29, 54, 73);
   line-height: 24px;
+  margin-bottom: 8px;
   padding-left: 10px;
   padding-right: 10px;
 }
@@ -38,4 +43,33 @@ body {
   line-height: 21px;
   padding-bottom: 15px;
   padding-top: 15px;
+}
+
+.ic-general-annotation {
+  display: flex;
+  flex-direction: row;
+}
+
+.ic-annotation-border {
+  background-color: #ececec;
+  border-radius: 12px;
+  margin-right: 8px;
+  min-width: 4px;
+}
+
+.ic-annotation-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.ic-annotation-actor {
+  font-size: 14px;
+}
+
+.ic-annotation-actor-name {
+  font-weight: 300;
+}
+
+.ic-annotation-title {
+  font-weight: 500;
 }
