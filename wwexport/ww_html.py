@@ -42,6 +42,12 @@ class WWMentionSpan(SpanToken):
         self.id = match.group(1)
         self.display = match.group(2)
 
+class WWSpaceMentionSpan(SpanToken):
+    pattern = re.compile(r"\<(\@space)\>")
+
+    def __init__(self, match):
+        self.parse_inner = False
+        self.display = match.group(1)
 
 class WWImageSpan(SpanToken):
     pattern = re.compile(r"\<\$image\|(.*?)(\|(([0-9])+x([0-9])+))?\>")
@@ -53,16 +59,27 @@ class WWImageSpan(SpanToken):
         self.length = match.group(4)
         self.height = match.group(5)
 
+class WWBoldSpan(SpanToken):
+    pattern = re.compile(r"\*([^*]+)\*")
+
+    def __init__(self, match):
+        self.target = match.group(1)
 
 class WWHTMLRenderer(html_renderer.HTMLRenderer):
     def __init__(self):
-        super().__init__(WWMentionSpan, WWImageSpan)
+        super().__init__(WWMentionSpan, WWSpaceMentionSpan, WWImageSpan, WWBoldSpan)
 
     def render_ww_mention_span(self, token):
         return "<strong>{name}</strong>".format(name=token.display)
 
+    def render_ww_space_mention_span(self, token):
+        return self.render_ww_mention_span(token)
+
     def render_ww_image_span(self, token):
         return "<img alt='Embedded Image' href='{target}'/>".format(target=token.id)
+
+    def render_ww_bold_span(self, token):
+        return "<strong>{inner}</strong>".format(inner=self.render_inner(token))
 
 
 jinja_env = Environment(
