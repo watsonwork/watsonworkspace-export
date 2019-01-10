@@ -182,7 +182,7 @@ def main(argv):
         logger.error(msg)
     except queries.UnknownRequestError as err:
         logger.exception(
-            "Export incomplete. Aborting with HTTP status code %s with response %s. If problem persists, run with a debug enabled and check the prior request. You may also run the export space by space.", err.status_code, err.text)
+            "Export incomplete. Aborting with HTTP status code %s. If problem persists, run with a debug enabled and check the prior request. You may also run the export space by space.", err.status_code)
         error = True
     except queries.GraphQLError:
         logger.exception("Export incomplete. Terminating with GraphQLError. If problem persists, run with a debug enabled and check the prior request. You may also run the export space by space.")
