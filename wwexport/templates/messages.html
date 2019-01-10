@@ -28,31 +28,15 @@
       <hr/>
       {% endif %}
       <div class="ic-transcript-item">
-        <div id="{{ message["message id"] }}" class="ic-message">
-          <div class="ic-avatar-message">
-            <div class="ic-message-data">
-              <div class="ic-message-meta">
-                <div tabindex="0" class="ic-person ic-person-with-card">{{ message["author name"]|name_case }}</div>
-                <span title="{{ ns.message_created|format_datetime }}" class="ic-timestamp">{{ ns.message_created|format_datetime }}</span>
-              </div>
-              <div class="ic-general-annotation ic-single-message-rendering">
-                <div class="ic-annotation-border" style="display: none;"></div>
-                <div class="ic-annotation-content">
-                  <div class="ic-message-text">
-                    <div class="ic-markdown-para">
-                      <span class="ic-markdown-para-content">
-                        <span class="ic-markdown-content-wrapper">
-                          <span class="ic-message-container">
-                            <span>{{ message["content"] | md | safe }}</span>
-                          </span>
-                        </span>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+        <div class="ic-message-meta">
+          <span class="ic-person">{{ message["author name"]|name_case }}</span>
+          <span class="ic-timestamp">{{ ns.message_created|format_datetime }}</span>
+        </div>
+        <div>
+          <div class="ic-annotation-border" style="display: none;"></div>
+          <span class="ic-message-container">
+            {{ message["content"] | md | safe }}
+          </span>
         </div>
       </div>
     {% set ns.last_message_created_date = ns.message_created.date() %}
