@@ -1,0 +1,61 @@
+.ww-export-header {
+  font-family: Helvetica Neue for IBM, Helvetica Neue, Helvetica, Arial, Roboto;
+  font-size: 12px;
+}
+
+.ic-person {
+  box-sizing: border-box;
+  color: rgb(29, 54, 73);
+  cursor: pointer;
+  display: inline-block;
+  font-family: Helvetica Neue for IBM, Helvetica Neue, Helvetica, Arial, Roboto;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18.2px;
+  margin-right: 5px;
+}
+
+.ic-timestamp {
+  box-sizing: border-box;
+  color: rgb(119, 118, 119);
+  display: inline-block;
+  font-family: Helvetica Neue for IBM, Helvetica Neue, Helvetica, Arial, Roboto;
+  font-size: 12px;
+  font-weight: 300;
+  line-height: 15.6px;
+}
+
+.ic-message-container {
+  box-sizing: border-box;
+  color: rgb(29, 54, 73);
+  font-family: Helvetica Neue for IBM, Helvetica Neue, Helvetica, Arial, Roboto;
+  font-weight: 200;
+  line-height: 24px;
+}
+
+.ic-transcript-item {
+  box-sizing: border-box;
+  color: rgb(29, 54, 73);
+  direction: ltr;
+  display: flex;
+  flex-direction: column;
+  font-family: Helvetica Neue for IBM, Helvetica Neue, Helvetica, Arial, Roboto;
+  line-height: 24px;
+  list-style-type: none;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.ic-message-date {
+  align-self: flex-start;
+  box-sizing: border-box;
+  color: rgb(119, 118, 119);
+  font-family: Helvetica Neue for IBM, Helvetica Neue, Helvetica, Arial, Roboto;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 21px;
+  list-style-type: none;
+  padding-bottom: 15px;
+  padding-right: 20px;
+  padding-top: 15px;
+}

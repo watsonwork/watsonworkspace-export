@@ -241,7 +241,7 @@ def find_messages_resume_point(space_export_root) -> ResumePoint:
 def get_DM_participant(space: dict, auth_token: str) -> dict:
     global __current_user
     dm_participant = None
-    if space["members"] and space["members"]["items"]:
+    if "members" in space["members"] and "items" in space["members"]:
         if not __current_user:
             __current_user = queries.current_user.execute(auth_token)
         other_participants = [member for member in space["members"]["items"] if member["id"] != __current_user["id"]]
@@ -254,24 +254,26 @@ def get_DM_participant(space: dict, auth_token: str) -> dict:
     return dm_participant
 
 
-def get_space_display_name(space: dict, auth_token: str):
-    space_display_name = space["id"]
+def space_pathsafe_name(space: dict, auth_token: str):
+    name = space["id"]
     if space["type"] == "DIRECT":
         other_participant = get_DM_participant(space, auth_token)
         if other_participant:
-            space_display_name = "{} - {}".format(other_participant["displayName"], other_participant["email"])
+            name = "{} - {}".format(other_participant["displayName"], other_participant["email"])
         else:
-            space_display_name = space["id"]
-            logger.error("space with id %s at %s like a direct messaging space, but we didn't find another member in it - we'll generate the display name based on the user ID", space["id"], space_display_name)
+            name = space["id"]
+            logger.error("space with id %s at %s like a direct messaging space, but we didn't find another member in it - we'll generate the display name based on the user ID", space["id"], name)
     else:
         if space["type"] != "TEAM":
             logger.warn("space with id %s has type %s - neither TEAM nor DIRECT (DM) - will treat the space as a team space", space["id"], space["type"])
         if space["title"]:
-            space_display_name = "{} {}".format(space["title"].replace("/", "-").replace("\\", "-"), space["id"])
+            name = "{} {}".format(space["title"], space["id"])
         else:
-            space_display_name = space["id"]
-            logger.warn("space with id %s at %s lacks a title", space["id"], space_display_name)
-    return space_display_name
+            name = space["id"]
+            logger.warn("space with id %s at %s lacks a title", space["id"], name)
+    if name:
+        name = name.translate(constants.FILE_NAME_TRANSLATION_TABLE)
+    return name
 
 
 def get_space_folder(space_type: str, space_display_name: str, root_path: PurePath, auth_token: str):
@@ -279,10 +281,10 @@ def get_space_folder(space_type: str, space_display_name: str, root_path: PurePa
     return root_path / type_folder / space_display_name
 
 
-def export_space(space: dict, auth_token: str, export_root_folder: PurePath, file_options: FileOptions = FileOptions.none, export_members: bool = True, export_messages: bool = True, export_annotations: bool = False) -> None:
+def export_space(space: dict, auth_token: str, export_root_folder: PurePath, file_options: FileOptions = FileOptions.none, export_members: bool = True, export_messages: bool = True, export_annotations: bool = False) -> (Path, str):
     export_time = datetime.datetime.now()
 
-    space_display_name = get_space_display_name(space, auth_token)
+    space_display_name = space_pathsafe_name(space, auth_token)
     space_export_root = get_space_folder(space["type"], space_display_name, export_root_folder, auth_token)
     space_export_root.mkdir(exist_ok=True, parents=True)
 
@@ -420,3 +422,7 @@ def export_space(space: dict, auth_token: str, export_root_folder: PurePath, fil
             logger.debug("Closing file at end of space export")
             space_messages_file.flush()
             space_messages_file.close()
+
+    tqdm.write("")
+
+    return space_export_root, space_display_name

@@ -11,6 +11,7 @@ pandas = "*"
 babel = "*"
 mistletoe = "*"
 tqdm = "*"
+bleach = "*"
 
 [dev-packages]
 
