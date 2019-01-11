@@ -1,9 +1,11 @@
 body {
   font-family: Helvetica Neue for IBM, Helvetica Neue, Helvetica, Arial, Roboto;
+  font-weight: 300;
 }
 
 .ww-export-header {
   font-size: 12px;
+  font-weight: 400;
 }
 
 .ic-person {
@@ -16,12 +18,7 @@ body {
 .ic-timestamp {
   color: rgb(119, 118, 119);
   font-size: 12px;
-  font-weight: 300;
   line-height: 15.6px;
-}
-
-.ic-message-container {
-  font-weight: 200;
 }
 
 .ic-message-container p {
@@ -64,10 +61,6 @@ body {
 
 .ic-annotation-actor {
   font-size: 14px;
-}
-
-.ic-annotation-actor-name {
-  font-weight: 300;
 }
 
 .ic-annotation-title {
