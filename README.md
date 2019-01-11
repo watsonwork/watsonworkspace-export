@@ -25,12 +25,31 @@ Setup is NOT required For
 - Running from a built executable
 
 To setup the environment
+
 1. Make sure you have Python 3.x installed (check with `python --version`). Note: this package was developed with python 3.7.
-2. Install required packages. Note that this step will download and install additional packages to your machine which have their own licenses attached. There are many ways to do this, but the most simple may be to run `pip install -r requirements.txt` from the project directory (you may need to use `pip3` instead of `pip` depending on your environment). A Pipfile is also provided if you choose to use pipenv commands.
 
-Note: It is highly recommended that you install required packages into a Python virtual environment. See https://docs.python.org/3/tutorial/venv.html and https://pipenv.readthedocs.io/en/latest/ for more information and approaches to virtual environments for Python.
+2. It is highly recommended that you install required packages into a Python virtual environment. For instance, before running the setup, you can create and activate a virtual environment for the project with:
 
-## Running as a script (does not require a build)
+  - MacOS
+  ```
+  python3 -m venv env
+  source env/bin/activate
+  ```
+  - Windows
+  ```
+  python3 -m venv env
+  env\Scripts\activate.bat
+  ```
+  This will create a directory called `env` in your working directory (normally in the project) and activate it for the current terminal session.
+
+
+3. Install required packages. Note that this step will download and install additional packages to your machine which have their own licenses attached. There are many ways to do this, but the most simple may be to run `pip install -r requirements.txt` from the project directory after activating your virtual environment (you may need to use `pip3` instead of `pip` depending on your environment). A Pipfile is also provided if you choose to use pipenv commands.
+
+See https://docs.python.org/3/tutorial/venv.html or https://pipenv.readthedocs.io/en/latest/ for more information and approaches to virtual environments for Python.
+
+## Running as a script
+
+Running as a script does not require a build, but does require the setup steps be completed.
 
 ### As a user
 
@@ -51,7 +70,7 @@ Run `python -m wwexport -h` for more options, including options on exporting fil
 
 1. Follow the steps for setup above.
 2. Change to the directory containing this project
-3. Run `pyinstaller build_mac.spec`. This will create directories called `build` and `dist` in your project, and your built executable will be at `dist/IBM Watson Workspace Export Utility` on Mac.
+3. Run `pyinstaller --clean build_mac.spec`. This will create directories called `build` and `dist` in your project, and your built executable will be at `dist/IBM Watson Workspace Export Utility` on Mac.
 
 Note that you can only build for the environment you build on. In other words, in order to build a Mac executable, you must run the build on MacOS. In order to build for Windows, you must run the build on Windows.
 

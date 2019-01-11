@@ -18,6 +18,7 @@ from wwexport import auth
 from wwexport import constants
 from wwexport import ww_html
 
+import pkgutil
 import hashlib
 import shutil
 import fnmatch
@@ -143,13 +144,13 @@ def main(argv):
     logger.info("Starting export")
 
     if args.html:
-        styles_src = Path(__file__).parent / "resources/styles.css"
-        with open(styles_src, "rb") as styles_file:
-            m = hashlib.md5()
-            m.update(styles_file.read())
-            md5 = m.hexdigest()
-            styles_destination = "styles_{}.css".format(md5)
-            shutil.copy(styles_src, export_root / styles_destination)
+        styles = pkgutil.get_data("wwexport", "resources/styles.css")
+        m = hashlib.md5()
+        m.update(styles)
+        md5 = m.hexdigest()
+        styles_destination = "styles_{}.css".format(md5)
+        with open(export_root / styles_destination, "wb") as export_styles:
+            export_styles.write(styles)
 
     try:
         spaces_to_export = []

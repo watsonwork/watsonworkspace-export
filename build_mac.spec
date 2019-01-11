@@ -1,11 +1,18 @@
 # -*- mode: python -*-
 
+import os
+
+working_dir = os.getcwd()
+
 block_cipher = None
 
 
 a = Analysis(['wwexport/__main__.py'],
              binaries=[],
-             datas=[],
+             datas=[
+                    (working_dir + '/wwexport/resources/styles.css','wwexport/resources'),
+                    (working_dir + '/wwexport/templates/messages.html','wwexport/templates'),
+                   ],
              hiddenimports=[],
              hookspath=[],
              runtime_hooks=[],
@@ -22,6 +29,7 @@ exe = EXE(pyz,
           a.zipfiles,
           a.datas,
           [],
+          #exclude_binaries=True, ## only if you use a collect step after this
           name='IBM Watson Workspace Export Utility',
           debug=False,
           bootloader_ignore_signals=False,
@@ -29,6 +37,15 @@ exe = EXE(pyz,
           upx=True,
           runtime_tmpdir=None,
           console=True , icon='wwexport/resources/icon.icns')
+
+#coll = COLLECT(exe,
+#           a.binaries,
+#           a.zipfiles,
+#           a.datas,
+#           strip=False,
+#           upx=True,
+#           name='wwexporttool')
+
 
 # work in progress - needs a GUI
 #app = BUNDLE(exe,
