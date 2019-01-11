@@ -70,7 +70,7 @@ Run `python -m wwexport -h` for more options, including options on exporting fil
 
 1. Follow the steps for setup above.
 2. Change to the directory containing this project
-3. Run `pyinstaller --clean build_mac.spec`. This will create directories called `build` and `dist` in your project, and your built executable will be at `dist/IBM Watson Workspace Export Utility` on Mac.
+3. Run `pyinstaller --clean build_mac.spec`. This will create directories called `build` and `dist` in your project, and your built executable will be at `dist/IBM Watson Workspace Export Utility` on Mac. Note you may be asked to confirm partially through the process if you use the `--clean` option.
 
 Note that you can only build for the environment you build on. In other words, in order to build a Mac executable, you must run the build on MacOS. In order to build for Windows, you must run the build on Windows.
 
@@ -80,7 +80,7 @@ Instead of executing `python -m wwexport` followed by options, you will execute 
 
 1. Change to the directory containing your built executable
 2. Obtain your JWT from Workspace by visiting https://workspace.ibm.com/exporttoken
-3. Run `./IBM Watson Workspace Export Utility --jwt=WATSON_WORK_JWT`, replacing WATSON_WORK_JWT with the value you copied from the export token page above
+3. Run `"./IBM Watson Workspace Export Utility" --jwt=WATSON_WORK_JWT`, replacing WATSON_WORK_JWT with the value you copied from the export token page above
 
 You may double click on the built executable to launch it as well. In this mode, the executable with prompt for your JWT in the terminal. Unfortunately, in some environments, terminal input length limit will prevent you from entering your JWT in this mode.
 
