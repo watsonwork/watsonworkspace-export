@@ -34,12 +34,16 @@ body {
 }
 
 .ic-message-date {
+  border-top: 1px solid #ECECEC;
+  border-bottom: 1px solid #ECECEC;
   color: rgb(119, 118, 119);
   font-size: 16px;
   font-weight: 400;
   line-height: 21px;
-  padding-bottom: 15px;
-  padding-top: 15px;
+  margin-bottom: 8px;
+  margin-top: 32px;
+  padding-bottom: 16px;
+  padding-top: 16px;
 }
 
 .ic-general-annotation {

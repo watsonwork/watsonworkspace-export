@@ -23,9 +23,7 @@
     {% for key,message in df.iterrows() %}
       {% set ns.message_created = message["created date"] | parse_datetime %}
       {% if ns.last_message_created_date == None or ns.message_created.date() != ns.last_message_created_date %}
-      <hr/>
       <div class="ic-message-date" title="{{ ns.message_created|format_date }}" >{{ ns.message_created|format_date(format="full") }}</div>
-      <hr/>
       {% endif %}
       <div class="ic-transcript-item">
         <div class="ic-message-meta">
