@@ -1,4 +1,4 @@
-# Copyright 2018 IBM
+# Copyright 2018-2019 IBM
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ from wwexport import ww_html
 import hashlib
 import shutil
 import fnmatch
-import requests
+import urllib
 import sys
 import argparse
 import getpass
@@ -178,17 +178,17 @@ def main(argv):
 
     except queries.UnauthorizedRequestError:
         msg = "Export incomplete. Looks like your JWT might have timed out or is invalid. Good thing this is resumable. Go get a new one and run this again. We'll pick up from where we left off (more or less)."
-        tqdm.write(msg)
+        print(msg)
         logger.error(msg)
     except queries.UnknownRequestError as err:
         logger.exception(
-            "Export incomplete. Aborting with HTTP status code %s with response %s. If problem persists, run with a debug enabled and check the prior request. You may also run the export space by space.", err.status_code, err.text)
+            "Export incomplete. Aborting with HTTP status code %s and reason %s. If problem persists, run with a debug enabled and check the prior request. You may also run the export space by space.", err.status_code, err.reason)
         error = True
     except queries.GraphQLError:
         logger.exception("Export incomplete. Terminating with GraphQLError. If problem persists, run with a debug enabled and check the prior request. You may also run the export space by space.")
         error = True
-    except requests.exceptions.ConnectionError:
-        logger.exception("Export incomplete. Connection was interrupted. Restart the export and it will resume where you left off (for the most part)")
+    except urllib.error.URLError:
+        logger.exception("Export incomplete. Problem with the HTTP Connection. Restart the export and it will resume where you left off (for the most part).")
         error = True
     except auth.UnauthorizedRequestError:
         logger.exception("Export incomplete. Unable to authenticate or reauthenticate.")
@@ -198,10 +198,14 @@ def main(argv):
         error = True
 
     if error:
-        tqdm.write("An error prevented some part of the export. Check the {} and {} files in your export directory for more information.".format(debug_file_name, error_file_name))
+        msg = "An error prevented some part of the export. Check the {} and {} files in your export directory for more information.".format(debug_file_name, error_file_name)
+        logger.critical(msg)
+        print(msg)
         sys.exit(1)
     else:
-        logger.info("Completed export")
+        msg = "Completed export"
+        logger.info(msg)
+        print(msg)
         sys.exit(0)
 
 

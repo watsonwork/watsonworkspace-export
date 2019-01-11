@@ -1,4 +1,4 @@
-# Copyright 2018 IBM
+# Copyright 2018-2019 IBM
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@ from wwexport import constants
 from wwexport import auth
 
 import datetime
-import requests
+import urllib
 import logging
 import json
 import time
@@ -39,9 +39,9 @@ class UnauthorizedRequestError(RequestError):
 class UnknownRequestError(RequestError):
     """Something else went wrong."""
 
-    def __init__(self, response: requests.Response):
-        self.status_code = response.status_code
-        self.text = response.text
+    def __init__(self, err):
+        self.status_code = err.code
+        self.reason = err.reason
 
 
 class GraphQLError(RequestError):
@@ -66,8 +66,8 @@ class Query:
         return {'jwt': auth_token.jwt_token(), 'Content-Type': 'application/graphql', 'x-graphql-view': self.graphql_views}
 
     @staticmethod
-    def __handle_json_response(response: requests.Response, reference_to_get: list):
-        next_level = response.json()
+    def __handle_json_response(response_json: str, reference_to_get: list):
+        next_level = response_json
         logger.log(5, "response JSON\n%s", next_level)
 
         if "errors" in next_level:
@@ -90,7 +90,7 @@ class Query:
                 return None
         return next_level
 
-    def __graphql_request(self, auth_token: auth.AuthToken, request: str, params: str = None) -> requests.Response:
+    def __graphql_request(self, auth_token: auth.AuthToken, graphql_request: str, params: str = None) -> str:
         now = datetime.datetime.now()
         if type(self).__last_graphql_request_time:
             elapsed = now - type(self).__last_graphql_request_time
@@ -101,27 +101,26 @@ class Query:
                 time.sleep(wait)
 
         type(self).__last_graphql_request_time = now
-        if params:
-            logger.debug("POST %s\n%s\n%s", constants.GRAPHQL_URL, request, params)
-        else:
-            logger.debug("POST %s\n%s", constants.GRAPHQL_URL, request)
-        response = requests.post(constants.GRAPHQL_URL,
-                                 data=request.encode(constants.REQUEST_ENCODING),
-                                 params=params,
-                                 headers=self.__graphql_headers(auth_token))
-        if response.status_code == 401:
-            raise UnauthorizedRequestError()
-        elif response.status_code != 200:
-            raise UnknownRequestError(response)
-
-        return response
+        url = constants.GRAPHQL_URL + "?" + urllib.parse.urlencode(params) if params else constants.GRAPHQL_URL
+        logger.debug("POST %s\n%s", url, graphql_request)
+        request = urllib.request.Request(url,
+                                         data=graphql_request.encode(constants.REQUEST_ENCODING),
+                                         headers=self.__graphql_headers(auth_token))
+        try:
+            with urllib.request.urlopen(request) as response:
+                return json.loads(response.read())
+        except urllib.error.HTTPError as err:
+            if err.code == 401:
+                raise UnauthorizedRequestError()
+            else:
+                raise UnknownRequestError(err)
 
     def execute(self, auth_token: auth.AuthToken, **kwargs: dict):
         params = {'variables': json.dumps(kwargs)} if kwargs is not None else {}
         logger.info("Executing query %s with params %s", self.name, params)
-        response = self.__graphql_request(
-            request=self.query_string, params=params, auth_token=auth_token)
-        return self.__handle_json_response(response, self.key_reference)
+        response_json = self.__graphql_request(
+            graphql_request=self.query_string, params=params, auth_token=auth_token)
+        return self.__handle_json_response(response_json, self.key_reference)
 
     def all_pages(self, auth_token: auth.AuthToken, **kwargs: dict):
         """Iterately calls execute with the provided query, using standard
@@ -144,36 +143,21 @@ def __download_headers(auth_token: auth.AuthToken) -> dict:
     return {'jwt': auth_token.jwt_token()}
 
 
-def download(file_id: str, file_title: str, folder: PurePath, auth_token: str):
-    logger.info("Downloading file %s with title %s", file_id, file_title)
-    download_url = constants.FILE_DOWNLOAD_URL_FORMAT.format(file_id)
-    logger.debug("file url %s", download_url)
-
-    logger.log(5, "waiting for %s seconds", constants.FILE_DOWNLOAD_WAIT)
-    time.sleep(constants.FILE_DOWNLOAD_WAIT)
-
-    response = requests.get(download_url, stream=True,
-                            headers=__download_headers(auth_token))
-    if response.status_code == 401:
-        raise UnauthorizedRequestError()
-    elif response.status_code == 204:
-        content_location = response.headers["x-content-location"]
-        response = requests.get(content_location, stream=True)
-    elif response.status_code != 200:
-        raise UnknownRequestError(response)
-
+def __handle_download(response, id: str, file_title: str, folder: PurePath):
     bytes_written = 0
     new_file = False
 
-    temp_file_path = folder / file_id
+    temp_file_path = folder / id
 
     try:
         # download to a temp file by using the id as the file name
         with open(temp_file_path, "wb") as local_file:
-            for chunk in response.iter_content(chunk_size=1024):
-                if chunk:
-                    local_file.write(chunk)
-                    bytes_written += len(chunk)
+            while True:
+                chunk = response.read(1024)
+                if not chunk:
+                    break
+                local_file.write(chunk)
+                bytes_written += len(chunk)
         logger.debug("wrote %s bytes", bytes_written)
 
         base_file_path = folder / file_title
@@ -200,12 +184,41 @@ def download(file_id: str, file_title: str, folder: PurePath, auth_token: str):
             new_file = True
             temp_file_path.rename(candidate_file_path)
             logger.debug("file %s with id %s saved as %s",
-                         file_title, file_id, candidate_file_path)
+                         file_title, id, candidate_file_path)
     finally:
         if temp_file_path.exists():
             temp_file_path.unlink()
 
     return candidate_file_path, new_file
+
+
+def download(file_id: str, file_title: str, folder: PurePath, auth_token: str):
+    logger.info("Downloading file %s with title %s", file_id, file_title)
+    download_url = constants.FILE_DOWNLOAD_URL_FORMAT.format(file_id)
+    logger.debug("file url %s", download_url)
+
+    logger.log(5, "waiting for %s seconds", constants.FILE_DOWNLOAD_WAIT)
+    time.sleep(constants.FILE_DOWNLOAD_WAIT)
+
+    request = urllib.request.Request(download_url,
+                                     headers=__download_headers(auth_token))
+    try:
+        with urllib.request.urlopen(request) as response:
+            if response.getcode() == 401:
+                raise UnauthorizedRequestError()
+            elif response.getcode() == 204:
+                content_location = response.headers["x-content-location"]
+                redirected_request = urllib.request.Request(content_location,
+                                                            headers=__download_headers(auth_token))
+                with urllib.request.urlopen(redirected_request) as redirected_response:
+                    return __handle_download(redirected_response, file_id, file_title, folder)
+            else:
+                return __handle_download(response, file_id, file_title, folder)
+    except urllib.error.HTTPError as err:
+        if err.code == 401:
+            raise UnauthorizedRequestError()
+        else:
+            raise UnknownRequestError(err)
 
 
 dm_spaces = Query("DM Spaces", """query getDMSpaces($after: String) {
