@@ -181,6 +181,7 @@ def export_space_files(space_id: str, folder: PurePath, auth_token: str, fetch_a
 
 
 def write_message_to_csv(message: str, writer: csv.DictWriter) -> None:
+    annotations = None
     annotationActor = None
     annotationTitle = None
     annotationColor = None
@@ -209,14 +210,12 @@ def write_message_to_csv(message: str, writer: csv.DictWriter) -> None:
         if "id" in message["createdBy"]:
             creatorId = message["createdBy"]["id"]
     if "annotations" in message:
-        writer.writerow([message["id"], creatorName, creatorId,
-                        message["created"], message["content"],
-                        message["annotations"]])
-    else:
-        writer.writerow([message["id"], creatorName, creatorId,
-                        message["created"], message["content"],
-                        None, annotationActor,
-                        annotationTitle, annotationColor])
+        annotations = message["annotations"]
+
+    writer.writerow([message["id"], creatorName, creatorId,
+                    message["created"], message["content"],
+                    annotations, annotationActor,
+                    annotationTitle, annotationColor])
 
 
 def get_messages_path(space_export_root: str, year: int, month: int) -> str:
