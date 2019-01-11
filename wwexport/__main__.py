@@ -65,6 +65,7 @@ def is_message_file(path: Path) -> bool:
 
 def main(argv):
     error = False
+    html_gen_errors = []
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         description="Export utility for Watson Workspace.",
@@ -174,10 +175,14 @@ def main(argv):
                     try:
                         ww_html.csv_to_html(file, styles=styles_destination)
                     except Exception:
+                        html_gen_errors.append(file)
                         logger.exception("An error occured while generating HTML for %s", file)
 
     except queries.UnauthorizedRequestError:
         msg = "Export incomplete. Looks like your JWT might have timed out or is invalid. Good thing this is resumable. Go get a new one and run this again. We'll pick up from where we left off (more or less)."
+        # just to make sure our tqdm status is scrolled up
+        print("")
+        print("")
         print(msg)
         logger.error(msg)
     except queries.UnknownRequestError as err:
@@ -196,17 +201,28 @@ def main(argv):
     except Exception:
         logger.exception("Export incomplete. Unknown error.")
         error = True
-
-    if error:
-        msg = "An error prevented some part of the export. Check the {} and {} files in your export directory for more information.".format(debug_file_name, error_file_name)
-        logger.critical(msg)
-        print(msg)
-        sys.exit(1)
     else:
         msg = "Completed export"
         logger.info(msg)
+        print("")
+        print("")
         print(msg)
         sys.exit(0)
+
+    # just to make sure our tqdm status is scrolled up
+    print("")
+    print("")
+
+    if len(html_gen_errors) > 0:
+        msg = "The following CSV message files could not be converted to HTML. Data has only been saved to CSV for these files. Rerunning the export may NOT attempt to regenerate these files - it is not expected that a retry will not help with these files. Check the {} and {} files in your export directory for more information.\n{}".format(debug_file_name, error_file_name, "\n".join([str(p) for p in html_gen_errors]))
+        logger.error(msg)
+        print(msg)
+
+    if error:
+        msg = "An error interrupted the export from completing. You may first want to retry the export and see if this error presists. Some errors, such as internet connection issues, will interrupt the export, but running again can continue where you left off. If this message persists, check the {} and {} files in your export directory for more information.".format(debug_file_name, error_file_name)
+        logger.critical(msg)
+        print(msg)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
