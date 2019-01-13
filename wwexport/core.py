@@ -193,7 +193,7 @@ def write_message_to_csv(message: str, writer: csv.DictWriter) -> None:
             if typedAnnotation["text"] is not None:
                 logger.debug(
                     "Content is empty, but found an annotation with text on message %s", message["id"])
-                message["content"] = typedAnnotation["text"]
+                message["content"] = typedAnnotation["text"] or " "
                 annotationActor = typedAnnotation["actor"]["name"]
                 annotationTitle = typedAnnotation["title"]
                 annotationColor = typedAnnotation["color"]
