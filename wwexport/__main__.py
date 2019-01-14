@@ -1,39 +1,44 @@
+# MIT License
+#
 # Copyright 2018-2019 IBM
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 
 from wwexport import core
 from wwexport import queries
 from wwexport import auth
 from wwexport import constants
 from wwexport import ww_html
+from wwexport import env
 
+import pkgutil
 import hashlib
-import shutil
 import fnmatch
 import urllib
 import sys
 import argparse
-import getpass
 import json
 import logging
 import logging.handlers
 from enum import Enum
 from pathlib import Path
 
-from tqdm import tqdm
-
-default_export_root = Path.home() / "Watson Workspace Export"
 debug_file_name = "debug.log"
 error_file_name = "errors.log"
 
@@ -71,7 +76,7 @@ def main(argv):
         description="Export utility for Watson Workspace.",
         epilog="For example, to export spaces without files, run `python wwexport`. To export spaces with files, run `python wwexport --files=ALL`. To export all spaces and DMs with all files, run `python wwexport --type=ALL --files=ALL`. Always check the {} file in your export directory. Source at https://github.com/watsonwork/watsonworkspace-export".format(error_file_name))
 
-    parser.add_argument("--dir", default=default_export_root, help="Directory to export to. This directory will be created if it doesn't exist.")
+    parser.add_argument("--dir", default=env.export_root, help="Directory to export to. This directory will be created if it doesn't exist.")
 
     auth_group = parser.add_mutually_exclusive_group()
 
@@ -95,10 +100,14 @@ def main(argv):
     logging_group.add_argument(
         "--loglevel", type=LogLevel, default=LogLevel.info, choices=list(LogLevel), help="Messages of this type will be printed to a {} file in the export directory. Regardless, errors and warnings are ALWAYS printed to a separate {}.".format(debug_file_name, error_file_name))
 
+    parser.add_argument("--gui", action="store_true", help="Indicates a windowed interface should be used instead of the console.")
+
     args = parser.parse_args()
 
-    export_root = Path(args.dir)
-    export_root.mkdir(exist_ok=True, parents=True)
+    env.export_root = Path(args.dir)
+    env.export_root.mkdir(exist_ok=True, parents=True)
+
+    env.gui = args.gui
 
     logger = logging.getLogger("wwexport")
     # set to the the finest level on the top level logger - the actual LogLevel
@@ -110,7 +119,10 @@ def main(argv):
 
     # error log
     error_log_handler = logging.handlers.RotatingFileHandler(
-        export_root / error_file_name, maxBytes=1048576, backupCount=10)
+        env.export_root / error_file_name,
+        maxBytes=1048576,
+        backupCount=10,
+        encoding=constants.FILE_ENCODING)
     error_log_handler.setFormatter(default_formatter)
     error_log_handler.setLevel(logging.WARN)
     logger.addHandler(error_log_handler)
@@ -118,7 +130,10 @@ def main(argv):
     # optional debug log
     if args.loglevel and args.loglevel != LogLevel.none:
         file_log_handler = logging.handlers.RotatingFileHandler(
-            export_root / debug_file_name, maxBytes=1048576, backupCount=10)
+            env.export_root / debug_file_name,
+            maxBytes=1048576,
+            backupCount=10,
+            encoding=constants.FILE_ENCODING)
         file_log_handler.setFormatter(default_formatter)
         file_log_handler.setLevel(str(args.loglevel))
         logger.addHandler(file_log_handler)
@@ -136,20 +151,20 @@ def main(argv):
     elif args.jwt:
         auth_token = auth.JWTAuthToken(args.jwt)
     else:
-        auth_token = auth.JWTAuthToken(getpass.getpass("Watson Work Auth Token (JWT): "))
+        auth_token = auth.JWTAuthToken(input("Watson Work Auth Token (JWT): "))
 
     # let's do this!
 
     logger.info("Starting export")
 
     if args.html:
-        styles_src = Path(__file__).parent / "resources/styles.css"
-        with open(styles_src, "rb") as styles_file:
-            m = hashlib.md5()
-            m.update(styles_file.read())
-            md5 = m.hexdigest()
-            styles_destination = "styles_{}.css".format(md5)
-            shutil.copy(styles_src, export_root / styles_destination)
+        styles = pkgutil.get_data("wwexport", "resources/styles.css")
+        m = hashlib.md5()
+        m.update(styles)
+        md5 = m.hexdigest()
+        styles_destination = "styles_{}.css".format(md5)
+        with open(env.export_root / styles_destination, "wb") as export_styles:
+            export_styles.write(styles)
 
     try:
         spaces_to_export = []
@@ -158,20 +173,30 @@ def main(argv):
         else:
             if args.type == SpaceType.spaces or args.type == SpaceType.all:
                 spaces = queries.team_spaces.all_pages(auth_token)
-                with open(export_root / "spaces.json", "w+", encoding=constants.FILE_ENCODING) as f:
+                with open(env.export_root / "spaces.json", "w+", encoding=constants.FILE_ENCODING) as f:
                     json.dump(spaces, f)
                 spaces_to_export.extend(spaces)
 
             if args.type == SpaceType.dms or args.type == SpaceType.all:
                 dm_spaces = queries.dm_spaces.all_pages(auth_token)
-                with open(export_root / "dms.json", "w+", encoding=constants.FILE_ENCODING) as f:
+                with open(env.export_root / "dms.json", "w+", encoding=constants.FILE_ENCODING) as f:
                     json.dump(dm_spaces, f)
                 spaces_to_export.extend(dm_spaces)
 
-        for space in tqdm(spaces_to_export, desc="Export Spaces", position=0, unit="space", dynamic_ncols=True):
-            space_root, space_display_name = core.export_space(space, auth_token, export_root, args.files, export_annotations=args.annotations)
+        for space in env.progress_bar(spaces_to_export,
+                                      desc="Export Spaces",
+                                      position=0,
+                                      unit="space",):
+            space_root, space_display_name = core.export_space(space, auth_token, env.export_root, args.files, export_annotations=args.annotations)
             if args.html:
-                for file in tqdm(filter(is_message_file, space_root.iterdir()), desc="{} HTML generation".format(space_display_name), position=1, dynamic_ncols=True, unit=" HTML files", initial=1):
+                for file in env.progress_bar(
+                        filter(is_message_file,
+                               space_root.iterdir()
+                               ),
+                        desc="{} HTML generation".format(space_display_name),
+                        position=1,
+                        unit=" HTML files",
+                        initial=1):
                     try:
                         ww_html.csv_to_html(file, styles=styles_destination)
                     except Exception:
