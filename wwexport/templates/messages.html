@@ -30,20 +30,30 @@
     {% for key,message in df.iterrows() %}
       {% set ns.message_created = message["created date"] | parse_datetime %}
       {% if ns.last_message_created_date == None or ns.message_created.date() != ns.last_message_created_date %}
-      <hr/>
       <div class="ic-message-date" title="{{ ns.message_created|format_date }}" >{{ ns.message_created|format_date(format="full") }}</div>
-      <hr/>
       {% endif %}
       <div class="ic-transcript-item">
         <div class="ic-message-meta">
           <span class="ic-person">{{ message["author name"]|name_case }}</span>
           <span class="ic-timestamp">{{ ns.message_created|format_datetime }}</span>
         </div>
-        <div>
-          <div class="ic-annotation-border" style="display: none;"></div>
-          <span class="ic-message-container">
-            {{ message["content"] | md | safe }}
-          </span>
+        <div class="ic-general-annotation">
+          {% if message.annotationTitle is string %}
+          <div class="ic-annotation-border" style="background-color: {{ message.annotationColor }}"></div>
+          {% endif %}
+          <div class="ic-annotation-content">
+            {% if message.annotationTitle is string %}
+            <div class="ic-annotation-actor">
+              {% if message.annotationActor is string %}
+              <span class="ic-annotation-actor-name">{{ message.annotationActor }}</span>
+              {% endif %}
+              <span class="ic-annotation-title">{{ message.annotationTitle }}</span>
+            </div>
+            {% endif %}
+            <div class="ic-message-container">
+              {{ message["content"] | md | safe }}
+            </div>
+          </div>
         </div>
       </div>
     {% set ns.last_message_created_date = ns.message_created.date() %}

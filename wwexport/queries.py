@@ -335,6 +335,10 @@ space_messages = Query("Space Messages", """query getMessages($spaceid: ID!, $ol
             ... on GenericAnnotation {
               text
               title
+              color
+              actor {
+                name
+              }
             }
           }
         }
@@ -359,6 +363,10 @@ space_messages_with_annotations = Query("Space Messages with Annotations", """qu
             ... on GenericAnnotation {
               text
               title
+              color
+              actor {
+                name
+              }
             }
           }
           annotations
