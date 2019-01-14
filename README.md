@@ -70,7 +70,7 @@ Run `python -m wwexport -h` for more options, including options on exporting fil
 
 1. Follow the steps for setup above.
 2. Change to the directory containing this project
-3. Run `pyinstaller --clean build_mac.spec`. This will create directories called `build` and `dist` in your project, and your built executable will be at `dist/IBM Watson Workspace Export Utility` on Mac. Note you may be asked to confirm partially through the process if you use the `--clean` option.
+3. Run `pyinstaller --clean build_mac.spec` or `pyinstaller --clean build_win.spec` depending on your platform. This will create directories called `build` and `dist` in your project, and your built executable will be at `dist/IBM Watson Workspace Export Utility` on Mac and `dist/IBM Watson Workspace Export Utility.exe` on Windows. You may be asked to confirm partially through the process if you use the `--clean` option.
 
 Note that you can only build for the environment you build on. In other words, in order to build a Mac executable, you must run the build on MacOS. In order to build for Windows, you must run the build on Windows.
 
