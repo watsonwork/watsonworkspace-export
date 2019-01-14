@@ -101,8 +101,6 @@ def main(argv):
     logging_group.add_argument(
         "--loglevel", type=LogLevel, default=LogLevel.info, choices=list(LogLevel), help="Messages of this type will be printed to a {} file in the export directory. Regardless, errors and warnings are ALWAYS printed to a separate {}.".format(debug_file_name, error_file_name))
 
-    parser.add_argument("--gui", action="store_true", help="Indicates a windowed interface should be used instead of the console.")
-
     args = parser.parse_args()
 
     env.export_root = Path(args.dir)
