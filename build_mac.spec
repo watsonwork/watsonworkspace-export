@@ -36,7 +36,7 @@ exe = EXE(pyz,
           strip=False,
           upx=True,
           runtime_tmpdir=None,
-          console=True , icon='wwexport/resources/icon.icns')
+          console=True , icon='resources/icon.icns')
 
 #coll = COLLECT(exe,
 #           a.binaries,
@@ -50,5 +50,5 @@ exe = EXE(pyz,
 # work in progress - needs a GUI
 #app = BUNDLE(exe,
 #             name='IBM Watson Workspace Export Utility.app',
-#             icon='wwexport/resources/icon.icns',
+#             icon='resources/icon.icns',
 #             bundle_identifier='com.ibm.workspace.export')

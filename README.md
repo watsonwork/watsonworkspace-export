@@ -32,12 +32,12 @@ To setup the environment
 
   - MacOS
   ```
-  python3 -m venv env
+  python -m venv env
   source env/bin/activate
   ```
   - Windows
   ```
-  python3 -m venv env
+  python -m venv env
   env\Scripts\activate.bat
   ```
   This will create a directory called `env` in your working directory (normally in the project) and activate it for the current terminal session.

@@ -15,6 +15,7 @@
 from wwexport import queries
 from wwexport import auth
 from wwexport import constants
+from wwexport import env
 
 import logging
 import csv
@@ -25,8 +26,6 @@ from pathlib import PurePath
 from dateutil.parser import parse
 from collections import namedtuple
 from enum import Enum
-
-from tqdm import tqdm
 
 logger = logging.getLogger("wwexport")
 __current_user = None
@@ -50,9 +49,10 @@ def export_space_members(space_id: str, space_display_name: str, filename: str, 
         space_members = []
         after = None
         space_members_writer.writerow(["name", "email", "id"])
-        # force tqdm to clear the previous counter's output
-        tqdm.write("")
-        with tqdm(desc="{} members".format(space_display_name), position=1, unit=" member batch", initial=1, dynamic_ncols=True) as member_progress:
+        with env.progress_bar(desc="{} members".format(space_display_name),
+                              position=1,
+                              unit=" member batch",
+                              initial=1) as member_progress:
             while True:
                 space_members_page = queries.space_members.execute(auth_token, spaceid=space_id, after=after)
                 for member in space_members_page["items"]:
@@ -325,8 +325,10 @@ def export_space(space: dict, auth_token: str, export_root_folder: PurePath, fil
         # while there are no more pages of messages
         space_messages_file = None
         message_query = queries.space_messages_with_annotations if export_annotations else queries.space_messages
-        tqdm.write("")
-        with tqdm(desc="{} messages".format(space_display_name), position=1, unit=" message batch", initial=1, dynamic_ncols=True) as message_progress:
+        with env.progress_bar(desc="{} messages".format(space_display_name),
+                              position=1,
+                              unit=" message batch",
+                              initial=1) as message_progress:
             while export_messages or export_annotations:
                 space_messages_page = message_query.execute(auth_token, spaceid=space["id"], oldest=next_page_time_in_milliseconds)
                 if not space_messages_page:
@@ -422,7 +424,5 @@ def export_space(space: dict, auth_token: str, export_root_folder: PurePath, fil
             logger.debug("Closing file at end of space export")
             space_messages_file.flush()
             space_messages_file.close()
-
-    tqdm.write("")
 
     return space_export_root, space_display_name
