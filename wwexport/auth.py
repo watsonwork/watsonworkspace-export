@@ -29,6 +29,7 @@ import argparse
 import logging
 import datetime
 from abc import abstractmethod
+from pathlib import Path
 
 logger = logging.getLogger("wwexport")
 
@@ -55,10 +56,17 @@ class AuthToken():
 
 class JWTAuthToken(AuthToken):
 
-    def __init__(self, jwt: str):
-        if jwt is None:
-            raise ValueError("jwt is None")
-        self.jwt = jwt
+    def __init__(self, jwt_or_path: str):
+        if jwt_or_path is None:
+            raise ValueError("auth token is None")
+        path = Path(jwt_or_path.strip())
+        if path.exists() and path.is_file():
+            logger.info("Obtaining JWT from file %s", path)
+            with open(path, "r") as file:
+                self.jwt = file.read()
+        else:
+            logger.info("Obtaining JWT as direct input")
+            self.jwt = jwt_or_path
 
     def jwt_token(self):
         return self.jwt

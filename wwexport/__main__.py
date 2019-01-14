@@ -26,6 +26,7 @@ from wwexport import auth
 from wwexport import constants
 from wwexport import ww_html
 from wwexport import env
+from wwexport import messages
 
 import pkgutil
 import hashlib
@@ -83,16 +84,16 @@ def main(argv):
     auth_group.add_argument(
         "--appcred", help="App credentials specified as appId:appSecret, obtained for an app from https://developer.watsonwork.ibm.com/apps. If both AppCred and JWT are specified, JWT is ignored. If AppCred is used, spaces to which the app has been directly added will be available for export.")
     auth_group.add_argument(
-        "--jwt", help="JWT token for accessing Watson Work. If both JWT and AppCred are omitted, you may enter a JWT interactively, but interactive mode may not work in some terminals due to input length limits.")
+        "--jwt", help="JWT token for accessing Watson Work, or a path to a file containing the JWT as plaintext. If both JWT and AppCred are omitted, you may supply a JWT or path to JWT interactively. The JWT may be obtained from https://workspace.ibm.com/exporttoken.")
 
     space_args = parser.add_mutually_exclusive_group()
     space_args.add_argument(
         "--spaceid", help="An optional ID of a space or DM to export. If omitted, all spaces of the type specified will be exported.")
     space_args.add_argument("--type", type=SpaceType, choices=list(SpaceType), default=SpaceType.spaces, help="Export team spaces, DMs, or all. This parameter is ignored if a space ID is specified.")
 
-    parser.add_argument("--files", type=core.FileOptions, choices=list(core.FileOptions), default=core.FileOptions.none, help="Specify how files will be exported, if at all. RESUME will only look at files since the most recently downloaded message. RESUME is useful if you have previously downloaded all files and just want to get any new content. ALL will page through metadata for all files to make sure older files are downloaded. Both options use a local metadata file to skip unnecessary downloads, and both options deduplicate among files in the space with the same name after downloading. You shouldn't have to worry about duplicate files, even if you use the ALL option multiple times. RESUME will be faster, but only use it if you are sure you have all files up to the latest local file already downloaded. If you are unsure, or this is the first time you are downloading files, ALL is suggested.")
+    parser.add_argument("--files", type=core.FileOptions, choices=list(core.FileOptions), default=core.FileOptions.all, help="Specify how files will be exported, if at all. RESUME will only look at files since the most recently downloaded message. RESUME is useful if you have previously downloaded all files and just want to get any new content. ALL will page through metadata for all files to make sure older files are downloaded. Both options use a local metadata file to skip unnecessary downloads, and both options deduplicate among files in the space with the same name after downloading. You shouldn't have to worry about duplicate files, even if you use the ALL option multiple times. RESUME will be faster, but only use it if you are sure you have all files up to the latest local file already downloaded. If you are unsure, or this is the first time you are downloading files, ALL is suggested.")
 
-    parser.add_argument("--html", action="store_true", help="For all spaces touched by the export, generate HTML versions. This will regenerate HTML for all messages of the spaces affected, not just new messages.")
+    # parser.add_argument("--html", action="store_true", help="For all spaces touched by the export, generate HTML versions. This will regenerate HTML for all messages of the spaces affected, not just new messages.")
 
     parser.add_argument("--annotations", action="store_true", help="Write all annotations in the message files. Even without this option, the content of a generic annotation will be exported if there is no other message content.")
 
@@ -106,8 +107,6 @@ def main(argv):
 
     env.export_root = Path(args.dir)
     env.export_root.mkdir(exist_ok=True, parents=True)
-
-    env.gui = args.gui
 
     logger = logging.getLogger("wwexport")
     # set to the the finest level on the top level logger - the actual LogLevel
@@ -151,20 +150,25 @@ def main(argv):
     elif args.jwt:
         auth_token = auth.JWTAuthToken(args.jwt)
     else:
-        auth_token = auth.JWTAuthToken(input("Watson Work Auth Token (JWT): "))
+        print(messages.WELCOME.format(env.export_root))
+        auth_token = auth.JWTAuthToken(input(messages.AUTH_PROMPT))
 
     # let's do this!
 
     logger.info("Starting export")
+    print("""
+Exporting to /Users/jon/Watson Workspace Export""")
 
-    if args.html:
-        styles = pkgutil.get_data("wwexport", "resources/styles.css")
-        m = hashlib.md5()
-        m.update(styles)
-        md5 = m.hexdigest()
-        styles_destination = "styles_{}.css".format(md5)
-        with open(env.export_root / styles_destination, "wb") as export_styles:
-            export_styles.write(styles)
+    # create a local copy of the styles file using a name based on hash
+    # so the HTML and CSS can be updated and an export resumed without breaking
+    # previous exports
+    styles = pkgutil.get_data("wwexport", "resources/styles.css")
+    m = hashlib.md5()
+    m.update(styles)
+    md5 = m.hexdigest()
+    styles_destination = "styles_{}.css".format(md5)
+    with open(env.export_root / styles_destination, "wb") as export_styles:
+        export_styles.write(styles)
 
     try:
         spaces_to_export = []
@@ -183,31 +187,32 @@ def main(argv):
                     json.dump(dm_spaces, f)
                 spaces_to_export.extend(dm_spaces)
 
-        for space in env.progress_bar(spaces_to_export,
-                                      desc="Export Spaces",
-                                      position=0,
-                                      unit="space",):
+        space_progress = env.progress_bar(spaces_to_export,
+                                          desc="Export Spaces",
+                                          position=0,
+                                          unit="space",)
+        for space in space_progress:
+            # core export (CSV and files)
             space_root, space_display_name = core.export_space(space, auth_token, env.export_root, args.files, export_annotations=args.annotations)
-            if args.html:
-                for file in env.progress_bar(
-                        filter(is_message_file,
-                               space_root.iterdir()
-                               ),
-                        desc="{} HTML generation".format(space_display_name),
-                        position=1,
-                        unit=" HTML files",
-                        initial=1):
-                    try:
-                        ww_html.csv_to_html(file, styles=styles_destination)
-                    except Exception:
-                        html_gen_errors.append(file)
-                        logger.exception("An error occured while generating HTML for %s", file)
+            space_progress.set_description(space_display_name[0:15] + "...")
+
+            # generate HTML
+            for file in env.progress_bar(
+                    filter(is_message_file,
+                           space_root.iterdir()
+                           ),
+                    desc="HTML generation".format(space_display_name),
+                    position=1,
+                    unit=" HTML files",
+                    initial=1):
+                try:
+                    ww_html.csv_to_html(file, styles=styles_destination)
+                except Exception:
+                    html_gen_errors.append(file)
+                    logger.exception("An error occured while generating HTML for %s", file)
 
     except queries.UnauthorizedRequestError:
-        msg = "Export incomplete. Looks like your JWT might have timed out or is invalid. Good thing this is resumable. Go get a new one and run this again. We'll pick up from where we left off (more or less)."
-        # just to make sure our tqdm status is scrolled up
-        print("")
-        print("")
+        msg = "Export incomplete. Looks like your authorization token might have timed out or is invalid. Good thing this is resumable. Get a new token from https://workspace.ibm.com/exporttoken and run this again. We'll pick up from where we left off (more or less)."
         print(msg)
         logger.error(msg)
     except queries.UnknownRequestError as err:
@@ -229,14 +234,8 @@ def main(argv):
     else:
         msg = "Completed export"
         logger.info(msg)
-        print("")
-        print("")
         print(msg)
         sys.exit(0)
-
-    # just to make sure our tqdm status is scrolled up
-    print("")
-    print("")
 
     if len(html_gen_errors) > 0:
         msg = "The following CSV message files could not be converted to HTML. Data has only been saved to CSV for these files. Rerunning the export may NOT attempt to regenerate these files - it is not expected that a retry will not help with these files. Check the {} and {} files in your export directory for more information.\n{}".format(debug_file_name, error_file_name, "\n".join([str(p) for p in html_gen_errors]))
