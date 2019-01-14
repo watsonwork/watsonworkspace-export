@@ -87,3 +87,7 @@ You may double click on the built executable to launch it as well. In this mode,
 ## Exported Metadata
 
 When files are exported, additional metadata files are created to save information about file creators, dates, and the relationship of file IDs to paths on the local file system. This aids when resuming an export since the tool uses the metadata files to skips downloads of files already downloaded. Unless IDs were used as file names (which is not very user friendly), it is otherwise not possible to know which files were downloaded without meta files, since multiple files can have the same name in a space. These meta files are also helpful in knowing information on the message associated with a file, or finding the file corresponding to a message.
+
+# LICENSE
+
+See the [LICENSE](LICENSE) file. Earlier versions of this project were released under Apache 2.0.
