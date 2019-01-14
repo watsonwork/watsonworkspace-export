@@ -1,9 +1,11 @@
 body {
   font-family: Helvetica Neue for IBM, Helvetica Neue, Helvetica, Arial, Roboto;
+  font-weight: 300;
 }
 
 .ww-export-header {
   font-size: 12px;
+  font-weight: 400;
 }
 
 .ic-person {
@@ -16,26 +18,55 @@ body {
 .ic-timestamp {
   color: rgb(119, 118, 119);
   font-size: 12px;
-  font-weight: 300;
   line-height: 15.6px;
 }
 
-.ic-message-container {
-  font-weight: 200;
+.ic-message-container p {
+  margin: 0;
 }
 
 .ic-transcript-item {
   color: rgb(29, 54, 73);
   line-height: 24px;
+  margin-bottom: 8px;
   padding-left: 10px;
   padding-right: 10px;
 }
 
 .ic-message-date {
+  border-top: 1px solid #ECECEC;
+  border-bottom: 1px solid #ECECEC;
   color: rgb(119, 118, 119);
   font-size: 16px;
   font-weight: 400;
   line-height: 21px;
-  padding-bottom: 15px;
-  padding-top: 15px;
+  margin-bottom: 8px;
+  margin-top: 32px;
+  padding-bottom: 16px;
+  padding-top: 16px;
+}
+
+.ic-general-annotation {
+  display: flex;
+  flex-direction: row;
+}
+
+.ic-annotation-border {
+  background-color: #ececec;
+  border-radius: 12px;
+  margin-right: 8px;
+  min-width: 4px;
+}
+
+.ic-annotation-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.ic-annotation-actor {
+  font-size: 14px;
+}
+
+.ic-annotation-title {
+  font-weight: 500;
 }

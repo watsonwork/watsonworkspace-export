@@ -181,13 +181,22 @@ def export_space_files(space_id: str, folder: PurePath, auth_token: str, fetch_a
 
 
 def write_message_to_csv(message: str, writer: csv.DictWriter) -> None:
+    annotations = None
+    annotationActor = None
+    annotationTitle = None
+    annotationColor = None
+
     # if there isn't content, pull it from the annotation if there is one
     if message["content"] is None:
         if message["typedAnnotations"] is not None and len(message["typedAnnotations"]) > 0:
-            if message["typedAnnotations"][0]["text"] is not None:
+            typedAnnotation = message["typedAnnotations"][0]
+            if typedAnnotation["text"] is not None:
                 logger.debug(
                     "Content is empty, but found an annotation with text on message %s", message["id"])
-                message["content"] = message["typedAnnotations"][0]["text"]
+                message["content"] = typedAnnotation["text"] or " "
+                annotationActor = typedAnnotation["actor"]["name"]
+                annotationTitle = typedAnnotation["title"]
+                annotationColor = typedAnnotation["color"]
             else:
                 logger.warn(
                     "Content is empty and the first annotation didn't have text on message %s", message["id"])
@@ -201,12 +210,12 @@ def write_message_to_csv(message: str, writer: csv.DictWriter) -> None:
         if "id" in message["createdBy"]:
             creatorId = message["createdBy"]["id"]
     if "annotations" in message:
-        writer.writerow([message["id"], creatorName, creatorId,
-                        message["created"], message["content"],
-                        message["annotations"]])
-    else:
-        writer.writerow([message["id"], creatorName, creatorId,
-                        message["created"], message["content"]])
+        annotations = message["annotations"]
+
+    writer.writerow([message["id"], creatorName, creatorId,
+                    message["created"], message["content"],
+                    annotations, annotationActor,
+                    annotationTitle, annotationColor])
 
 
 def get_messages_path(space_export_root: str, year: int, month: int) -> str:
@@ -390,12 +399,9 @@ def export_space(space: dict, auth_token: str, export_root_folder: PurePath, fil
                             if not resuming_file:
                                 logger.debug(
                                     "Starting a new file. Writing header.")
-                                if export_annotations:
-                                    space_messages_writer.writerow(
-                                        ["message id", "author name", "author id", "created date", "content", "annotations"])
-                                else:
-                                    space_messages_writer.writerow(
-                                        ["message id", "author name", "author id", "created date", "content"])
+                                space_messages_writer.writerow(
+                                    ["message id", "author name", "author id", "created date", "content", "annotations",
+                                     "annotationActor", "annotationTitle", "annotationColor"])
 
                         write_message_to_csv(message, space_messages_writer)
                     else:
