@@ -225,6 +225,9 @@ def download(file_id: str, file_title: str, folder: PurePath, auth_token: str):
     except urllib.error.HTTPError as err:
         if err.code == 401:
             raise UnauthorizedRequestError()
+        elif err.code == 404:
+            logger.error("Encountered 404 while downloading file %s", file_id)
+            return None, False
         else:
             raise UnknownRequestError(err)
 
