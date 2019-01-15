@@ -57,7 +57,6 @@ class AuthToken():
 class JWTAuthToken(AuthToken):
 
     def __init__(self, jwt_or_path: str):
-        print(jwt_or_path)
         if jwt_or_path is None:
             raise ValueError("auth token is None")
         path = Path(jwt_or_path.strip())
