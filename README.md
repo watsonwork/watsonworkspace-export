@@ -22,7 +22,7 @@ Due to the possible expiration of the JWT auth token, and potential for other is
 
 1. Change to the directory containing this project
 2. Obtain your JWT from Workspace by visiting https://workspace.ibm.com/exporttoken
-3. Run `python -m wwexport --jwt=WATSON_WORK_JWT`, replacing WATSON_WORK_JWT with the value you copied from the export token page above
+3. Run `python -m wwexport --jwt WATSON_WORK_JWT`, replacing WATSON_WORK_JWT with the value you copied from the export token page above
 
 ### As an app
 
