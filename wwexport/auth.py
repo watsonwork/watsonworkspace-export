@@ -22,7 +22,6 @@
 
 from wwexport import constants
 
-import re
 import json
 import urllib
 import sys
