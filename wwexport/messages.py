@@ -20,25 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import platform
-
-if platform.system() == "Windows":
-    WELCOME = """
-This tool will help you export content from IBM Watson Workspace.
-
-  A directory will be created at
-    {}
-  if it does not exist already.
-
-  All spaces and direct messages will be downloaded, including all files.
-
-  Please visit https://workspace.ibm.com/exporttoken
-  to generate an access token copy it to your clipboard.
-  """
-    AUTH_PROMPT = """  Paste your personal access token here and press enter.
-"""
-elif platform.system() == "Darwin":
-    WELCOME = """
+WELCOME = """
 This tool will help you export content from IBM Watson Workspace.
 
   A directory will be created at
@@ -50,15 +32,8 @@ This tool will help you export content from IBM Watson Workspace.
   Please visit https://workspace.ibm.com/exporttoken
   to generate an access token and download it as a file.
   """
-    AUTH_PROMPT = """  Copy the file you downloaded and paste it here.
-  You may also drag and drop the file from the Finder to this window.
+AUTH_PROMPT = """  Copy the file you downloaded and paste it here.
+  You may also drag and drop the file to this window.
 
   You should see the path of the file you downloaded here, then press enter.
-  """
-else:
-    WELCOME = """
-This tool will help you export content from IBM Watson Workspace.
-
-  Please visit https://workspace.ibm.com/exporttoken to obtain a personal access token."""
-    AUTH_PROMPT = """  Paste your access token or a path to the file containing your access token here and press enter.
   """

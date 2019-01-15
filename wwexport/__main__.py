@@ -153,7 +153,7 @@ def main(argv):
 
     logger.info("Starting export")
     print("""
-Exporting to /Users/jon/Watson Workspace Export""")
+Exporting to {}""".format(env.export_root))
 
     # create a local copy of the styles file using a name based on hash
     # so the HTML and CSS can be updated and an export resumed without breaking
