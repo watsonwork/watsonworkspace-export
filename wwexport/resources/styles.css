@@ -3,6 +3,10 @@ body {
   font-weight: 300;
 }
 
+img {
+  display: block;
+}
+
 .ww-export-header {
   font-size: 12px;
   font-weight: 400;
@@ -69,4 +73,31 @@ body {
 
 .ic-annotation-title {
   font-weight: 500;
+}
+
+.ic-file {
+  border: 1px solid #ECECEC;
+  border-radius: 6px;
+  display: block;
+  padding: 4px 0;
+  text-decoration: none;
+}
+
+.ic-file::before, .ic-file::after {
+  content: "";
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-left: 8px;
+  margin-right: 8px;
+  position: relative;
+  top: 2px;
+}
+
+.ic-file::before {
+  background-image: url('data:image/svg+xml;utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M10.519.358A1.002 1.002 0 0 0 9.837.09H2.292a1 1 0 0 0-1 1v13.82a1 1 0 0 0 1 1h11.416a1 1 0 0 0 1-1V4.695a1 1 0 0 0-.318-.732L10.519.358zM13.4 4.409h-3.063V1.556L13.4 4.409zM2.292 14.91V1.09h7.046v3.818a.5.5 0 0 0 .5.5h3.871v9.501H2.292z"/><path d="M11.771 11.458H4.437a.5.5 0 0 0 0 1h7.334a.5.5 0 0 0 0-1zM11.775 7.828H4.44a.5.5 0 0 0 0 1h7.334a.5.5 0 0 0 .001-1z"/></svg>');
+}
+
+.ic-file:hover::after {
+  background-image: url('data:image/svg+xml;utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M15.316 10.159a.5.5 0 0 0-.5.5l.032 2.693-13.718.033v-2.726a.5.5 0 0 0-1 0v2.726a.97.97 0 0 0 .968.968h13.751a.97.97 0 0 0 .968-.968v-2.726a.501.501 0 0 0-.501-.5z"></path><path d="M7.63 11.186a.495.495 0 0 0 .354.147.503.503 0 0 0 .354-.147l3.709-3.709a.5.5 0 0 0-.707-.707L8.484 9.626V2.064a.5.5 0 0 0-1 0v7.561L4.628 6.77a.5.5 0 0 0-.707.707l3.709 3.709z"></path></svg>');
 }
