@@ -26,7 +26,7 @@
     <link rel="stylesheet" type="text/css" href="../../{{styles}}" />
 </head>
 <body>
-    <div class="ww-export-header">This file was generated on {{ export_date|format_datetime('long') }}</div>
+    <div class="ww-export-header">All message times are in UTC.</div>
     {% set ns = namespace(last_message_created_date=None, message_created=None) %}
     {% for message in reader %}
       {% set ns.message_created = message["created date"] | parse_datetime %}

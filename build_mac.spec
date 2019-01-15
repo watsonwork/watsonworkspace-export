@@ -39,7 +39,10 @@ if single_file:
               upx=True,
               runtime_tmpdir=None,
               console=True,
-              icon='resources/icon.icns')
+              icon='resources/icon.icns',
+              info_plist={
+                  'CFBundlePackageType': 'APPL'
+              },)
 else:
     exe = EXE(pyz,
               a.scripts,
