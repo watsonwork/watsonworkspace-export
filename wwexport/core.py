@@ -57,7 +57,7 @@ def export_space_members(space_id: str, space_display_name: str, filename: str, 
         space_members = []
         after = None
         space_members_writer.writerow(["name", "email", "id"])
-        with env.progress_bar(desc="Members",
+        with env.progress_bar(desc="Getting members",
                               position=1,
                               unit=" member batch",
                               initial=1) as member_progress:
@@ -303,10 +303,12 @@ def get_space_folder(space_type: str, space_display_name: str, root_path: PurePa
     return root_path / type_folder / space_display_name
 
 
-def export_space(space: dict, auth_token: str, export_root_folder: PurePath, file_options: FileOptions = FileOptions.none, export_members: bool = True, export_messages: bool = True, export_annotations: bool = False) -> (Path, str):
+def export_space(space: dict, auth_token: str, export_root_folder: PurePath, file_options: FileOptions = FileOptions.none, export_members: bool = True, export_messages: bool = True, export_annotations: bool = False, space_progress=False) -> (Path, str):
     export_time = datetime.datetime.now()
 
     space_display_name = space_pathsafe_name(space, auth_token)
+    space_progress.set_description(space_display_name[0:15] + "...")
+
     space_export_root = get_space_folder(space["type"], space_display_name, export_root_folder, auth_token)
     space_export_root.mkdir(exist_ok=True, parents=True)
 
@@ -347,7 +349,7 @@ def export_space(space: dict, auth_token: str, export_root_folder: PurePath, fil
         # while there are no more pages of messages
         space_messages_file = None
         message_query = queries.space_messages_with_annotations if export_annotations else queries.space_messages
-        with env.progress_bar(desc="Messages",
+        with env.progress_bar(desc="Downloading messages",
                               position=1,
                               unit=" message batch",
                               initial=1) as message_progress:

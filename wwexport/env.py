@@ -21,12 +21,10 @@
 # SOFTWARE.
 
 from tqdm import tqdm
-
 from pathlib import Path
 
 export_root = Path.home() / "Watson Workspace Export"
 
 
-def progress_bar(iterable=None, desc=None, position=None, unit=None, initial=0):
-    # return tqdm(iterable, position=position + 1, leave=False, dynamic_ncols=True)
-    return tqdm(iterable, desc=desc, position=position, leave=False if position > 0 else True, unit=unit, initial=initial, ncols=75)  #dynamic_ncols=True)
+def progress_bar(iterable=None, desc=None, position=None, unit="", initial=0):
+    return tqdm(iterable, desc=desc, position=position, unit=unit, initial=initial, leave=False if position > 0 else True, ncols=75)

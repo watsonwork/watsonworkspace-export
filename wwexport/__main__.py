@@ -186,11 +186,11 @@ Exporting to /Users/jon/Watson Workspace Export""")
         space_progress = env.progress_bar(spaces_to_export,
                                           desc="Export Spaces",
                                           position=0,
-                                          unit="space",)
+                                          unit="space",
+                                          )
         for space in space_progress:
             # core export (CSV and files)
-            space_root, space_display_name = core.export_space(space, auth_token, env.export_root, args.files, export_annotations=args.annotations)
-            space_progress.set_description(space_display_name[0:15] + "...")
+            space_root, space_display_name = core.export_space(space, auth_token, env.export_root, args.files, export_annotations=args.annotations, space_progress=space_progress)
 
             # generate HTML
             for file in env.progress_bar(

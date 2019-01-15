@@ -50,7 +50,7 @@ This tool will help you export content from IBM Watson Workspace.
   Please visit https://workspace.ibm.com/exporttoken
   to generate an access token and download it as a file.
   """
-    AUTH_PROMPT = """  Using the MacOS Finder, copy the file you downloaded and paste it here.
+    AUTH_PROMPT = """  Copy the file you downloaded and paste it here.
   You may also drag and drop the file from the Finder to this window.
 
   You should see the path of the file you downloaded here, then press enter.
