@@ -15,8 +15,10 @@
 from wwexport import constants
 
 import argparse
+import csv
 import datetime
 import dateutil
+import dateutil.parser
 import json
 import logging
 import os
@@ -29,7 +31,6 @@ from bleach.sanitizer import Cleaner
 from bleach.linkifier import LinkifyFilter
 from mistletoe import Document, html_renderer
 from mistletoe.span_token import SpanToken
-import pandas as pd
 from babel.dates import format_date, format_datetime, format_time
 
 from jinja2 import Environment, PackageLoader, select_autoescape
@@ -135,7 +136,6 @@ jinja_env.filters["md"] = _jinja_filter_md
 
 def csv_to_html(file: Path, styles: str = "styles.css"):
     logger.info("Converting %s to HTML", file)
-    df = pd.read_csv(file, encoding=constants.FILE_ENCODING)
     template = jinja_env.get_template("messages.html")
     file_paths_file_path = file.parent / "files" / constants.FILES_META_FOLDER / constants.FILE_PATHS_FILE_NAME
 
@@ -145,10 +145,12 @@ def csv_to_html(file: Path, styles: str = "styles.css"):
         with open(file_paths_file_path, "r", encoding=constants.FILE_ENCODING) as paths_file:
             paths = json.load(paths_file)
 
-    with open(file.with_suffix(".html"), "w+") as html_file:
+    with open(file.with_suffix(".html"), "w+", encoding=constants.FILE_ENCODING) as html_file, \
+         open(file, "r", encoding=constants.FILE_ENCODING) as csv_file:
+        reader = csv.DictReader(csv_file)
         html_file.write(
             template.render(
-                df=df,
+                reader=reader,
                 month_year="201811",
                 export_date=datetime.datetime.now(),
                 styles=styles,

@@ -5,7 +5,6 @@ name = "pypi"
 
 [packages]
 python-dateutil = "==2.7.5"
-pandas = "==0.23.4"
 mistletoe = "==0.7.1"
 tqdm = "==4.29.0"
 bleach = "==3.0.2"
