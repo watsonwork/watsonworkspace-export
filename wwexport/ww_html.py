@@ -29,7 +29,6 @@ import dateutil
 import dateutil.parser
 import json
 import logging
-import os
 import re
 import sys
 from pathlib import Path
@@ -40,8 +39,10 @@ from bleach.linkifier import LinkifyFilter
 from mistletoe import Document, html_renderer
 from mistletoe.span_token import SpanToken
 from babel.dates import format_date, format_datetime, format_time
+# force pyinstaller to find babel.numbers and include it
+import babel.numbers
 
-from jinja2 import Environment, PackageLoader, select_autoescape
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 logger = logging.getLogger("wwexport")
 paths = {}
@@ -71,13 +72,17 @@ class WWSpaceMentionSpan(SpanToken):
         self.display = match.group(1)
 
 class WWFileSpan(SpanToken):
-    pattern = re.compile(r"\<\$file\|(.+)\|(.*)\>")
+    pattern = re.compile(r"\<\$file\|(.*?)(\|(.*?))?\>")
 
     def __init__(self, match):
         global paths
         self.parse_inner = False
-        self.path = paths[match.group(1)]
-        self.name = match.group(2)
+        if match.group(1) in paths:
+            self.path = paths[match.group(1)]
+        else:
+            self.path = ""
+            logger.error("Could not resolve link in message to file for file %s", match.group(1))
+        self.name = match.group(3)
 
 class WWImageSpan(SpanToken):
     pattern = re.compile(r"\<\$image\|(.*?)(\|(([0-9])+x([0-9])+))?\>")
@@ -85,7 +90,11 @@ class WWImageSpan(SpanToken):
     def __init__(self, match):
         global paths
         self.parse_inner = False
-        self.path = paths[match.group(1)]
+        if match.group(1) in paths:
+            self.path = paths[match.group(1)]
+        else:
+            self.path = ""
+            logger.error("Could not resolve link in message to image for image %s", match.group(1))
         self.width = match.group(4)
         self.height = match.group(5)
 
@@ -116,7 +125,8 @@ class WWHTMLRenderer(html_renderer.HTMLRenderer):
 
 
 jinja_env = Environment(
-    loader=PackageLoader('wwexport', 'templates'),
+    # use of the FileSystemLoader is required for PyInstaller packaging
+    loader=FileSystemLoader(searchpath=str(Path(__file__).parent / "templates")),
     autoescape=select_autoescape(['html', 'xml'])
 )
 

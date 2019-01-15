@@ -213,7 +213,7 @@ Exporting to /Users/jon/Watson Workspace Export""")
                     logger.exception("An error occured while generating HTML for %s", file)
 
     except queries.UnauthorizedRequestError:
-        msg = "Export incomplete. Looks like your authorization token might have timed out or is invalid. Good thing this is resumable. Get a new token from https://workspace.ibm.com/exporttoken and run this again. We'll pick up from where we left off (more or less)."
+        msg = "\nExport incomplete. Looks like your authorization token might have timed out or is invalid. Good thing this is resumable. Get a new token from https://workspace.ibm.com/exporttoken and run this again. We'll pick up from where we left off (more or less)."
         print(msg)
         logger.error(msg)
     except queries.UnknownRequestError as err:
@@ -233,18 +233,18 @@ Exporting to /Users/jon/Watson Workspace Export""")
         logger.exception("Export incomplete. Unknown error.")
         error = True
     else:
-        msg = "Completed export"
+        msg = "\nCompleted export\n"
         logger.info(msg)
         print(msg)
         sys.exit(0)
 
     if len(html_gen_errors) > 0:
-        msg = "The following CSV message files could not be converted to HTML. Data has only been saved to CSV for these files. Rerunning the export may NOT attempt to regenerate these files - it is not expected that a retry will not help with these files. Check the {} and {} files in your export directory for more information.\n{}".format(debug_file_name, error_file_name, "\n".join([str(p) for p in html_gen_errors]))
+        msg = "\nThe following CSV message files could not be converted to HTML. Data has only been saved to CSV for these files. Rerunning the export may NOT attempt to regenerate these files - it is not expected that a retry will not help with these files. Check the {} and {} files in your export directory for more information.\n{}".format(debug_file_name, error_file_name, "\n".join([str(p) for p in html_gen_errors]))
         logger.error(msg)
         print(msg)
 
     if error:
-        msg = "An error interrupted the export from completing. You may first want to retry the export and see if this error presists. Some errors, such as internet connection issues, will interrupt the export, but running again can continue where you left off. If this message persists, check the {} and {} files in your export directory for more information.".format(debug_file_name, error_file_name)
+        msg = "\nAn error interrupted the export from completing. You may first want to retry the export and see if this error presists. Some errors, such as internet connection issues, will interrupt the export, but running again can continue where you left off. If this message persists, check the {} and {} files in your export directory for more information.".format(debug_file_name, error_file_name)
         logger.critical(msg)
         print(msg)
         sys.exit(1)
