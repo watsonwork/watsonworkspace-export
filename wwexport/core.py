@@ -164,7 +164,8 @@ def export_space_files(space_id: str, folder: PurePath, auth_token: str, fetch_a
                             else:
                                 file_path, new_file = queries.download(
                                     file["id"], file["title"], folder, auth_token)
-                                file_path_by_id[file["id"]] = str(file_path)
+                                if file_path:
+                                    file_path_by_id[file["id"]] = str(file_path)
                                 if new_file:
                                     downloaded += 1
                                 else:
