@@ -32,5 +32,8 @@ This tool will help you export content from IBM Watson Workspace.
   Please visit https://workspace.ibm.com/exporttoken
   to generate an access token and download it as a file.
   """
-AUTH_PROMPT = """  Paste your personal access token here and press enter.
-"""
+AUTH_PROMPT = """  Copy the file you downloaded and paste it here.
+  You may also drag and drop the file to this window.
+
+  You should see the path of the file you downloaded here, then press enter.
+  """
