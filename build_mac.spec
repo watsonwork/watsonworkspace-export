@@ -59,10 +59,3 @@ else:
               strip=False,
               upx=True,
               name='wwexporttool')
-
-
-# work in progress - needs a GUI
-#app = BUNDLE(exe,
-#             name='IBM Watson Workspace Export Utility.app',
-#             icon='resources/icon.icns',
-#             bundle_identifier='com.ibm.workspace.export')

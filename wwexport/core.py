@@ -57,7 +57,7 @@ def export_space_members(space_id: str, space_display_name: str, filename: str, 
         space_members = []
         after = None
         space_members_writer.writerow(["name", "email", "id"])
-        with env.progress_bar(desc="{} members".format(space_display_name),
+        with env.progress_bar(desc="Getting members",
                               position=1,
                               unit=" member batch",
                               initial=1) as member_progress:
@@ -119,58 +119,63 @@ def export_space_files(space_id: str, folder: PurePath, auth_token: str, fetch_a
         previous_page_ids = set()
         next_page_time_in_milliseconds = None
 
-        while True:
-            space_files_page = queries.space_files.execute(auth_token, spaceid=space_id, timestamp=next_page_time_in_milliseconds)
-            if space_files_page:
-                logger.debug("Fetched page with %s files for space %s", len(
-                    space_files_page), space_id)
-            elif len(previous_page_ids) == 0:
-                logger.debug("No files found for space %s", space_id)
-                break
-            else:
-                logger.error(
-                    "Fetched page with no files for space %s, but expected this page to contain at least one file.")
-                break
-
-            folder.mkdir(exist_ok=True, parents=True)
-
-            found_file = False
-            page_ids = set()
-            for file in space_files_page:
-                file_created_ms = int(
-                    parse(file["created"]).timestamp() * 1000)
-                if file_created_ms >= fetch_after_timestamp:
-                    file_graphqlitem_by_id[file["id"]] = file
-                    if file["id"] in previous_page_ids:
-                        logger.debug(
-                            "skipping file with id %s since it was in the last page", file["id"])
-                    else:
-                        found_file = True
-                        page_ids.add(file["id"])
-                        if next_page_time_in_milliseconds:
-                            next_page_time_in_milliseconds = min(
-                                next_page_time_in_milliseconds, file_created_ms)
-                        else:
-                            next_page_time_in_milliseconds = file_created_ms
-                        if file["id"] in file_path_by_id and Path(file_path_by_id[file["id"]]).exists():
-                            logger.debug(
-                                "file %s is already downloaded to %s, skipping download", file["id"], file_path_by_id[file["id"]])
-                            already_downloaded += 1
-                        else:
-                            file_path, new_file = queries.download(
-                                file["id"], file["title"], folder, auth_token)
-                            file_path_by_id[file["id"]] = str(file_path)
-                            if new_file:
-                                downloaded += 1
-                            else:
-                                duplicates += 1
+        with env.progress_bar(desc="Downloading files",
+                              position=1,
+                              unit=" files",
+                              initial=1) as file_progress:
+            while True:
+                space_files_page = queries.space_files.execute(auth_token, spaceid=space_id, timestamp=next_page_time_in_milliseconds)
+                if space_files_page:
+                    logger.debug("Fetched page with %s files for space %s", len(
+                        space_files_page), space_id)
+                elif len(previous_page_ids) == 0:
+                    logger.debug("No files found for space %s", space_id)
+                    break
                 else:
-                    logger.debug(
-                        "ignoring file %s since it is before the requested resume point %s", file["id"], fetch_after_timestamp)
+                    logger.error(
+                        "Fetched page with no files for space %s, but expected this page to contain at least one file.")
+                    break
 
-            previous_page_ids = page_ids
-            if not found_file:
-                break
+                folder.mkdir(exist_ok=True, parents=True)
+
+                found_file = False
+                page_ids = set()
+                for file in space_files_page:
+                    file_progress.update()
+                    file_created_ms = int(
+                        parse(file["created"]).timestamp() * 1000)
+                    if file_created_ms >= fetch_after_timestamp:
+                        file_graphqlitem_by_id[file["id"]] = file
+                        if file["id"] in previous_page_ids:
+                            logger.debug(
+                                "skipping file with id %s since it was in the last page", file["id"])
+                        else:
+                            found_file = True
+                            page_ids.add(file["id"])
+                            if next_page_time_in_milliseconds:
+                                next_page_time_in_milliseconds = min(
+                                    next_page_time_in_milliseconds, file_created_ms)
+                            else:
+                                next_page_time_in_milliseconds = file_created_ms
+                            if file["id"] in file_path_by_id and Path(file_path_by_id[file["id"]]).exists():
+                                logger.debug(
+                                    "file %s is already downloaded to %s, skipping download", file["id"], file_path_by_id[file["id"]])
+                                already_downloaded += 1
+                            else:
+                                file_path, new_file = queries.download(
+                                    file["id"], file["title"], folder, auth_token)
+                                file_path_by_id[file["id"]] = str(file_path)
+                                if new_file:
+                                    downloaded += 1
+                                else:
+                                    duplicates += 1
+                    else:
+                        logger.debug(
+                            "ignoring file %s since it is before the requested resume point %s", file["id"], fetch_after_timestamp)
+
+                previous_page_ids = page_ids
+                if not found_file:
+                    break
 
     finally:
         # if we have some metadata, write it
@@ -298,10 +303,12 @@ def get_space_folder(space_type: str, space_display_name: str, root_path: PurePa
     return root_path / type_folder / space_display_name
 
 
-def export_space(space: dict, auth_token: str, export_root_folder: PurePath, file_options: FileOptions = FileOptions.none, export_members: bool = True, export_messages: bool = True, export_annotations: bool = False) -> (Path, str):
+def export_space(space: dict, auth_token: str, export_root_folder: PurePath, file_options: FileOptions = FileOptions.none, export_members: bool = True, export_messages: bool = True, export_annotations: bool = False, space_progress=False) -> (Path, str):
     export_time = datetime.datetime.now()
 
     space_display_name = space_pathsafe_name(space, auth_token)
+    space_progress.set_description(space_display_name[0:15] + "...")
+
     space_export_root = get_space_folder(space["type"], space_display_name, export_root_folder, auth_token)
     space_export_root.mkdir(exist_ok=True, parents=True)
 
@@ -342,7 +349,7 @@ def export_space(space: dict, auth_token: str, export_root_folder: PurePath, fil
         # while there are no more pages of messages
         space_messages_file = None
         message_query = queries.space_messages_with_annotations if export_annotations else queries.space_messages
-        with env.progress_bar(desc="{} messages".format(space_display_name),
+        with env.progress_bar(desc="Downloading messages",
                               position=1,
                               unit=" message batch",
                               initial=1) as message_progress:
