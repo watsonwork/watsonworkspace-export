@@ -22,5 +22,7 @@
 
 import locale
 import os
+import platform
 
-os.environ["LC_TIME"] = locale.getdefaultlocale()[0]
+if platform.system() == "Windows":
+    os.environ["LC_TIME"] = locale.getdefaultlocale()[0]
