@@ -22,6 +22,7 @@
 
 from wwexport import constants
 
+import re
 import json
 import urllib
 import sys
@@ -57,6 +58,7 @@ class AuthToken():
 class JWTAuthToken(AuthToken):
 
     def __init__(self, jwt_or_path: str):
+        print(jwt_or_path)
         if jwt_or_path is None:
             raise ValueError("auth token is None")
         path = Path(jwt_or_path.strip())
@@ -65,8 +67,17 @@ class JWTAuthToken(AuthToken):
             with open(path, "r") as file:
                 self.jwt = file.read()
         else:
-            logger.info("Obtaining JWT as direct input")
-            self.jwt = jwt_or_path
+            # it could be we have a path like "token (1).txt"
+            # when dropped in MacOS, this becomes "token\ \(1\).txt"
+            # so let's try again but remove slashes
+            path = Path("".join(jwt_or_path.strip().split("\\")))
+            if path.exists() and path.is_file():
+                logger.info("Obtaining JWT from file %s", path)
+                with open(path, "r") as file:
+                    self.jwt = file.read()
+            else:
+                logger.info("Obtaining JWT as direct input")
+                self.jwt = jwt_or_path
 
     def jwt_token(self):
         return self.jwt
