@@ -62,7 +62,7 @@ class JWTAuthToken(AuthToken):
         path = Path(jwt_or_path.strip())
         if path.exists() and path.is_file():
             logger.info("Obtaining JWT from file %s", path)
-            with open(path, "r") as file:
+            with open(path, "r", encoding=constants.FILE_ENCODING) as file:
                 self.jwt = file.read()
         else:
             # it could be we have a path like "token (1).txt"
@@ -71,7 +71,7 @@ class JWTAuthToken(AuthToken):
             path = Path("".join(jwt_or_path.strip().split("\\")))
             if path.exists() and path.is_file():
                 logger.info("Obtaining JWT from file %s", path)
-                with open(path, "r") as file:
+                with open(path, "r", encoding=constants.FILE_ENCODING) as file:
                     self.jwt = file.read()
             else:
                 logger.info("Obtaining JWT as direct input")
