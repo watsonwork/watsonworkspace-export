@@ -1,16 +1,24 @@
-# Copyright 2018 IBM
+# MIT License
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# Copyright 2018-2019 IBM
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 
 from wwexport import constants
 
@@ -21,7 +29,6 @@ import dateutil
 import dateutil.parser
 import json
 import logging
-import os
 import re
 import sys
 from pathlib import Path
@@ -32,8 +39,10 @@ from bleach.linkifier import LinkifyFilter
 from mistletoe import Document, html_renderer
 from mistletoe.span_token import SpanToken
 from babel.dates import format_date, format_datetime, format_time
+# force pyinstaller to find babel.numbers and include it
+import babel.numbers
 
-from jinja2 import Environment, PackageLoader, select_autoescape
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 logger = logging.getLogger("wwexport")
 paths = {}
@@ -63,13 +72,17 @@ class WWSpaceMentionSpan(SpanToken):
         self.display = match.group(1)
 
 class WWFileSpan(SpanToken):
-    pattern = re.compile(r"\<\$file\|(.+)\|(.*)\>")
+    pattern = re.compile(r"\<\$file\|(.*?)(\|(.*?))?\>")
 
     def __init__(self, match):
         global paths
         self.parse_inner = False
-        self.path = paths[match.group(1)]
-        self.name = match.group(2)
+        if match.group(1) in paths:
+            self.path = paths[match.group(1)]
+        else:
+            self.path = ""
+            logger.error("Could not resolve link in message to file for file %s", match.group(1))
+        self.name = match.group(3)
 
 class WWImageSpan(SpanToken):
     pattern = re.compile(r"\<\$image\|(.*?)(\|(([0-9])+x([0-9])+))?\>")
@@ -77,7 +90,11 @@ class WWImageSpan(SpanToken):
     def __init__(self, match):
         global paths
         self.parse_inner = False
-        self.path = paths[match.group(1)]
+        if match.group(1) in paths:
+            self.path = paths[match.group(1)]
+        else:
+            self.path = ""
+            logger.error("Could not resolve link in message to image for image %s", match.group(1))
         self.width = match.group(4)
         self.height = match.group(5)
 
@@ -108,7 +125,8 @@ class WWHTMLRenderer(html_renderer.HTMLRenderer):
 
 
 jinja_env = Environment(
-    loader=PackageLoader('wwexport', 'templates'),
+    # use of the FileSystemLoader is required for PyInstaller packaging
+    loader=FileSystemLoader(searchpath=str(Path(__file__).parent / "templates")),
     autoescape=select_autoescape(['html', 'xml'])
 )
 

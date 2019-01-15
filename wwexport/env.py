@@ -1,6 +1,6 @@
 # MIT License
 #
-# Copyright 2018 IBM
+# Copyright 2019 IBM
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -20,26 +20,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import datetime
+from tqdm import tqdm
+from pathlib import Path
 
-REQUEST_ENCODING = "UTF-8"
-FILE_ENCODING = "UTF-8"
+export_root = Path.home() / "Watson Workspace Export"
 
-MESSAGES_FILE_NAME_PATTERN = "{year}.{month} messages.csv"
-FILES_META_FOLDER = "_meta"
-FILE_ENTRIES_FILE_NAME = "entries.json"
-FILE_PATHS_FILE_NAME = "paths.json"
 
-OAUTH_URL = "https://api.watsonwork.ibm.com/oauth/token"
-OAUTH_REQUEST_HEADERS = {'Content-Type': 'application/x-www-form-urlencoded'}
-JWT_TOKEN_REFRESH_BUFFER = datetime.timedelta(seconds=60)
-
-GRAPHQL_URL = "https://api.watsonwork.ibm.com/graphql"
-GRAPHQL_VIEWS = "DIRECT_MESSAGING,RESOURCE,TYPED_ANNOTATIONS,EXPERIMENTAL,PUBLIC"
-
-FILE_DOWNLOAD_URL_FORMAT = "https://api.watsonwork.ibm.com/files/api/v1/files/file/{}/content/noredirect"
-
-MIN_GRAPHQL_INTERVAL = datetime.timedelta(seconds=2)
-FILE_DOWNLOAD_WAIT = 2  # seconds
-
-FILE_NAME_TRANSLATION_TABLE = str.maketrans("/\\<>|", "-----", ":\"?*")
+def progress_bar(iterable=None, desc=None, position=None, unit="", initial=0):
+    return tqdm(iterable, desc=desc, position=position, unit=unit, initial=initial, leave=False if position > 0 else True, ncols=75)

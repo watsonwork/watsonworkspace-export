@@ -1,20 +1,29 @@
-# Copyright 2018 IBM
+# MIT License
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# Copyright 2018-2019 IBM
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 
 from wwexport import queries
 from wwexport import auth
 from wwexport import constants
+from wwexport import env
 
 import logging
 import csv
@@ -25,8 +34,6 @@ from pathlib import PurePath
 from dateutil.parser import parse
 from collections import namedtuple
 from enum import Enum
-
-from tqdm import tqdm
 
 logger = logging.getLogger("wwexport")
 __current_user = None
@@ -50,9 +57,10 @@ def export_space_members(space_id: str, space_display_name: str, filename: str, 
         space_members = []
         after = None
         space_members_writer.writerow(["name", "email", "id"])
-        # force tqdm to clear the previous counter's output
-        tqdm.write("")
-        with tqdm(desc="{} members".format(space_display_name), position=1, unit=" member batch", initial=1, dynamic_ncols=True) as member_progress:
+        with env.progress_bar(desc="Getting members",
+                              position=1,
+                              unit=" member batch",
+                              initial=1) as member_progress:
             while True:
                 space_members_page = queries.space_members.execute(auth_token, spaceid=space_id, after=after)
                 for member in space_members_page["items"]:
@@ -111,58 +119,64 @@ def export_space_files(space_id: str, folder: PurePath, auth_token: str, fetch_a
         previous_page_ids = set()
         next_page_time_in_milliseconds = None
 
-        while True:
-            space_files_page = queries.space_files.execute(auth_token, spaceid=space_id, timestamp=next_page_time_in_milliseconds)
-            if space_files_page:
-                logger.debug("Fetched page with %s files for space %s", len(
-                    space_files_page), space_id)
-            elif len(previous_page_ids) == 0:
-                logger.debug("No files found for space %s", space_id)
-                break
-            else:
-                logger.error(
-                    "Fetched page with no files for space %s, but expected this page to contain at least one file.")
-                break
-
-            folder.mkdir(exist_ok=True, parents=True)
-
-            found_file = False
-            page_ids = set()
-            for file in space_files_page:
-                file_created_ms = int(
-                    parse(file["created"]).timestamp() * 1000)
-                if file_created_ms >= fetch_after_timestamp:
-                    file_graphqlitem_by_id[file["id"]] = file
-                    if file["id"] in previous_page_ids:
-                        logger.debug(
-                            "skipping file with id %s since it was in the last page", file["id"])
-                    else:
-                        found_file = True
-                        page_ids.add(file["id"])
-                        if next_page_time_in_milliseconds:
-                            next_page_time_in_milliseconds = min(
-                                next_page_time_in_milliseconds, file_created_ms)
-                        else:
-                            next_page_time_in_milliseconds = file_created_ms
-                        if file["id"] in file_path_by_id and Path(file_path_by_id[file["id"]]).exists():
-                            logger.debug(
-                                "file %s is already downloaded to %s, skipping download", file["id"], file_path_by_id[file["id"]])
-                            already_downloaded += 1
-                        else:
-                            file_path, new_file = queries.download(
-                                file["id"], file["title"], folder, auth_token)
-                            file_path_by_id[file["id"]] = str(file_path)
-                            if new_file:
-                                downloaded += 1
-                            else:
-                                duplicates += 1
+        with env.progress_bar(desc="Downloading files",
+                              position=1,
+                              unit=" files",
+                              initial=1) as file_progress:
+            while True:
+                space_files_page = queries.space_files.execute(auth_token, spaceid=space_id, timestamp=next_page_time_in_milliseconds)
+                if space_files_page:
+                    logger.debug("Fetched page with %s files for space %s", len(
+                        space_files_page), space_id)
+                elif len(previous_page_ids) == 0:
+                    logger.debug("No files found for space %s", space_id)
+                    break
                 else:
-                    logger.debug(
-                        "ignoring file %s since it is before the requested resume point %s", file["id"], fetch_after_timestamp)
+                    logger.error(
+                        "Fetched page with no files for space %s, but expected this page to contain at least one file.")
+                    break
 
-            previous_page_ids = page_ids
-            if not found_file:
-                break
+                folder.mkdir(exist_ok=True, parents=True)
+
+                found_file = False
+                page_ids = set()
+                for file in space_files_page:
+                    file_progress.update()
+                    file_created_ms = int(
+                        parse(file["created"]).timestamp() * 1000)
+                    if file_created_ms >= fetch_after_timestamp:
+                        file_graphqlitem_by_id[file["id"]] = file
+                        if file["id"] in previous_page_ids:
+                            logger.debug(
+                                "skipping file with id %s since it was in the last page", file["id"])
+                        else:
+                            found_file = True
+                            page_ids.add(file["id"])
+                            if next_page_time_in_milliseconds:
+                                next_page_time_in_milliseconds = min(
+                                    next_page_time_in_milliseconds, file_created_ms)
+                            else:
+                                next_page_time_in_milliseconds = file_created_ms
+                            if file["id"] in file_path_by_id and Path(file_path_by_id[file["id"]]).exists():
+                                logger.debug(
+                                    "file %s is already downloaded to %s, skipping download", file["id"], file_path_by_id[file["id"]])
+                                already_downloaded += 1
+                            else:
+                                file_path, new_file = queries.download(
+                                    file["id"], file["title"], folder, auth_token)
+                                if file_path:
+                                    file_path_by_id[file["id"]] = str(file_path)
+                                if new_file:
+                                    downloaded += 1
+                                else:
+                                    duplicates += 1
+                    else:
+                        logger.debug(
+                            "ignoring file %s since it is before the requested resume point %s", file["id"], fetch_after_timestamp)
+
+                previous_page_ids = page_ids
+                if not found_file:
+                    break
 
     finally:
         # if we have some metadata, write it
@@ -290,10 +304,12 @@ def get_space_folder(space_type: str, space_display_name: str, root_path: PurePa
     return root_path / type_folder / space_display_name
 
 
-def export_space(space: dict, auth_token: str, export_root_folder: PurePath, file_options: FileOptions = FileOptions.none, export_members: bool = True, export_messages: bool = True, export_annotations: bool = False) -> (Path, str):
+def export_space(space: dict, auth_token: str, export_root_folder: PurePath, file_options: FileOptions = FileOptions.none, export_members: bool = True, export_messages: bool = True, export_annotations: bool = False, space_progress=False) -> (Path, str):
     export_time = datetime.datetime.now()
 
     space_display_name = space_pathsafe_name(space, auth_token)
+    space_progress.set_description(space_display_name[0:15] + "...")
+
     space_export_root = get_space_folder(space["type"], space_display_name, export_root_folder, auth_token)
     space_export_root.mkdir(exist_ok=True, parents=True)
 
@@ -334,8 +350,10 @@ def export_space(space: dict, auth_token: str, export_root_folder: PurePath, fil
         # while there are no more pages of messages
         space_messages_file = None
         message_query = queries.space_messages_with_annotations if export_annotations else queries.space_messages
-        tqdm.write("")
-        with tqdm(desc="{} messages".format(space_display_name), position=1, unit=" message batch", initial=1, dynamic_ncols=True) as message_progress:
+        with env.progress_bar(desc="Downloading messages",
+                              position=1,
+                              unit=" message batch",
+                              initial=1) as message_progress:
             while export_messages or export_annotations:
                 space_messages_page = message_query.execute(auth_token, spaceid=space["id"], oldest=next_page_time_in_milliseconds)
                 if not space_messages_page:
@@ -428,7 +446,5 @@ def export_space(space: dict, auth_token: str, export_root_folder: PurePath, fil
             logger.debug("Closing file at end of space export")
             space_messages_file.flush()
             space_messages_file.close()
-
-    tqdm.write("")
 
     return space_export_root, space_display_name
