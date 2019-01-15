@@ -20,7 +20,7 @@
 <body>
     <div class="ww-export-header">This file was generated on {{ export_date|format_datetime('long') }}</div>
     {% set ns = namespace(last_message_created_date=None, message_created=None) %}
-    {% for key,message in df.iterrows() %}
+    {% for message in reader %}
       {% set ns.message_created = message["created date"] | parse_datetime %}
       {% if ns.last_message_created_date == None or ns.message_created.date() != ns.last_message_created_date %}
       <div class="ic-message-date" title="{{ ns.message_created|format_date }}" >{{ ns.message_created|format_date(format="full") }}</div>
@@ -31,7 +31,7 @@
           <span class="ic-timestamp">{{ ns.message_created|format_datetime }}</span>
         </div>
         <div class="ic-general-annotation">
-          {% if message.annotationTitle is string %}
+          {% if message.annotationTitle %}
           <div class="ic-annotation-border" style="background-color: {{ message.annotationColor }}"></div>
           {% endif %}
           <div class="ic-annotation-content">
