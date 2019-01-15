@@ -168,7 +168,8 @@ def __handle_download(response, id: str, file_title: str, folder: PurePath):
                 bytes_written += len(chunk)
         logger.debug("wrote %s bytes", bytes_written)
 
-        base_file_path = folder / file_title
+        safe_name = file_title.translate(constants.FILE_NAME_TRANSLATION_TABLE) if file_title else "Unknown"
+        base_file_path = folder / safe_name
         candidate_file_path = base_file_path
 
         # compare to files with the same title, if it's new, keep it with an
