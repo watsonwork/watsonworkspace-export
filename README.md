@@ -55,7 +55,7 @@ Running as a script does not require a build, but does require the setup steps b
 
 1. Obtain your JWT from Workspace by visiting https://workspace.ibm.com/exporttoken
 2. Change to the directory containing this project
-3. Run `python -m wwexport --jwt=WATSON_WORK_JWT`, replacing WATSON_WORK_JWT with the value you copied from the export token page above
+3. Run `python -m wwexport --jwt WATSON_WORK_JWT`, replacing WATSON_WORK_JWT with the value you copied from the export token page above
 
 ### As an app
 

@@ -23,6 +23,10 @@
 import locale
 import os
 import platform
+import sys
+
+if getattr(sys, 'frozen', False):
+    os.environ['SSL_CERT_FILE'] = os.path.join(sys._MEIPASS, 'lib', 'cert.pem')
 
 if platform.system() == "Windows":
     os.environ["LC_TIME"] = locale.getdefaultlocale()[0]

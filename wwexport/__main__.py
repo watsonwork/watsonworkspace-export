@@ -72,9 +72,17 @@ def is_message_file(path: Path) -> bool:
 def main(argv):
     error = False
     html_gen_errors = []
+
+    try:
+        buildtxt_binary = pkgutil.get_data("wwexport", "build.txt")
+    except FileNotFoundError:
+        build_info = "LOCAL SCRIPT"
+    else:
+        build_info = buildtxt_binary.decode(constants.FILE_ENCODING, "ignore")
+
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        description="Export utility for Watson Workspace.",
+        description="Export utility for Watson Workspace, build {}".format(build_info),
         epilog="For example, to export spaces without files, run `python wwexport`. To export spaces with files, run `python wwexport --files=ALL`. To export all spaces and DMs with all files, run `python wwexport --type=ALL --files=ALL`. Always check the {} file in your export directory. Source at https://github.com/watsonwork/watsonworkspace-export".format(error_file_name))
 
     parser.add_argument("--dir", default=env.export_root, help="Directory to export to. This directory will be created if it doesn't exist.")
@@ -89,7 +97,7 @@ def main(argv):
     space_args = parser.add_mutually_exclusive_group()
     space_args.add_argument(
         "--spaceid", help="An optional ID of a space or DM to export. If omitted, all spaces of the type specified will be exported.")
-    space_args.add_argument("--type", type=SpaceType, choices=list(SpaceType), default=SpaceType.spaces, help="Export team spaces, DMs, or all. This parameter is ignored if a space ID is specified.")
+    space_args.add_argument("--type", type=SpaceType, choices=list(SpaceType), default=SpaceType.all, help="Export team spaces, DMs, or all. This parameter is ignored if a space ID is specified.")
 
     parser.add_argument("--files", type=core.FileOptions, choices=list(core.FileOptions), default=core.FileOptions.all, help="Specify how files will be exported, if at all. RESUME will only look at files since the most recently downloaded message. RESUME is useful if you have previously downloaded all files and just want to get any new content. ALL will page through metadata for all files to make sure older files are downloaded. Both options use a local metadata file to skip unnecessary downloads, and both options deduplicate among files in the space with the same name after downloading. You shouldn't have to worry about duplicate files, even if you use the ALL option multiple times. RESUME will be faster, but only use it if you are sure you have all files up to the latest local file already downloaded. If you are unsure, or this is the first time you are downloading files, ALL is suggested.")
 
@@ -132,6 +140,8 @@ def main(argv):
         file_log_handler.setFormatter(default_formatter)
         file_log_handler.setLevel(str(args.loglevel))
         logger.addHandler(file_log_handler)
+
+    logger.info("wwexport - running build %s", build_info)
 
     # auth
     auth_token = None
