@@ -59,23 +59,28 @@ class JWTAuthToken(AuthToken):
     def __init__(self, jwt_or_path: str):
         if jwt_or_path is None:
             raise ValueError("auth token is None")
-        path = Path(jwt_or_path.strip())
-        if path.exists() and path.is_file():
-            logger.info("Obtaining JWT from file %s", path)
-            with open(path, "r", encoding=constants.FILE_ENCODING) as file:
-                self.jwt = file.read()
-        else:
-            # it could be we have a path like "token (1).txt"
-            # when dropped in MacOS, this becomes "token\ \(1\).txt"
-            # so let's try again but remove slashes
-            path = Path("".join(jwt_or_path.strip().split("\\")))
+        # strip quotes for windows, and strip whitespace for MacOS
+        path = Path(jwt_or_path.strip().strip("\""))
+        try:
             if path.exists() and path.is_file():
                 logger.info("Obtaining JWT from file %s", path)
                 with open(path, "r", encoding=constants.FILE_ENCODING) as file:
                     self.jwt = file.read()
             else:
-                logger.info("Obtaining JWT as direct input")
-                self.jwt = jwt_or_path
+                # it could be we have a path like "token (1).txt"
+                # when dropped in MacOS, this becomes "token\ \(1\).txt"
+                # so let's try again but remove slashes
+                path = Path("".join(jwt_or_path.strip().split("\\")))
+                if path.exists() and path.is_file():
+                    logger.info("Obtaining JWT from file %s", path)
+                    with open(path, "r", encoding=constants.FILE_ENCODING) as file:
+                        self.jwt = file.read()
+                else:
+                    logger.info("Obtaining JWT as direct input")
+                    self.jwt = jwt_or_path
+        except OSError:
+            logger.info("Obtaining JWT as direct input")
+            self.jwt = jwt_or_path
 
     def jwt_token(self):
         return self.jwt

@@ -137,11 +137,17 @@ def _jinja_filter_name_case(val: str):
 
 def _jinja_filter_md(val: str):
     with WWHTMLRenderer() as renderer:
-        return cleaner.clean(
-            renderer.render(
-                Document(val)
-            )
-        )
+        content = None
+        try:
+            content = renderer.render(Document(val))
+        except NameError:
+            logger.exception("Problem with markdown conversion - using message as plaintext for some message content")
+            content = val
+        except ValueError:
+            logger.exception("Problem with markdown conversion - using message as plaintext for some message content")
+            content = val
+
+        return cleaner.clean(content)
 
 
 jinja_env.filters["format_date"] = format_date
