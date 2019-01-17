@@ -23,7 +23,8 @@ print(cert_datas)
 try:
   git_hash_process = subprocess.Popen(["git", "log", "-1", "--format=%H"],
                                        stdout=subprocess.PIPE,
-                                       stderr=subprocess.STDOUT)
+                                       stderr=subprocess.STDOUT,
+                                       cwd=working_dir)
   if git_hash_process.returncode is 0:
     git_hash,_ = git_hash_process.communicate()
     git_hash = git_hash.decode("UTF-8").rstrip("\n\r")
@@ -35,14 +36,15 @@ try:
 
   git_status_process = subprocess.Popen(["git", "status", "-s"],
                                        stdout=subprocess.PIPE,
-                                       stderr=subprocess.STDOUT)
+                                       stderr=subprocess.STDOUT,
+                                       cwd=working_dir)
   git_status,_ = git_status_process.communicate()
   git_uncommitted = len(git_status.decode("UTF-8").rstrip("\n\r")) > 0
   print("Git uncommitted changes {}".format(git_uncommitted))
   if git_uncommitted:
       git_hash = git_hash + "+"
 
-  build_info = "{} - {}".format(datetime.datetime.now(), git_hash)
+  build_info = "mac {} - {}".format(datetime.datetime.now(), git_hash)
 
 except FileNotFoundError as e:
   print("FileNotFound on subprocess attempting to get commit info from git - do you have git installed and is this a git repo?")
