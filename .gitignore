@@ -105,3 +105,6 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# custom build file for use by build_*.spec files
+build.txt

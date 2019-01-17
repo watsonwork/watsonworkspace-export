@@ -27,7 +27,8 @@ This tool will help you export content from IBM Watson Workspace.
     {}
   if it does not exist already.
 
-  All spaces and direct messages will be downloaded, including all files.
+  All spaces and direct messages will be downloaded by default,
+  including all files (run this command with -h to see all options).
 
   Please visit https://workspace.ibm.com/exporttoken
   to generate an access token and download it as a file.
