@@ -58,6 +58,7 @@ class JWTAuthToken(AuthToken):
 
     def __init__(self, jwt_or_path: str):
         if jwt_or_path is None:
+            raise ValueError("auth token is None")
         # strip quotes for windows, and strip whitespace for MacOS
         path = Path(jwt_or_path.strip().strip("\""))
         try:
