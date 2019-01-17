@@ -16,13 +16,12 @@ try:
                                        stderr=subprocess.STDOUT,
                                        cwd=working_dir,
                                        env=os.environ)
-  if git_hash_process.returncode is None or 0:
-    git_hash,_ = git_hash_process.communicate()
-    git_hash = git_hash.decode("UTF-8").rstrip("\n\r")
+  git_hash_response,_ = git_hash_process.communicate()
+  if git_hash_process.returncode is 0:
+    git_hash = git_hash_response.decode("UTF-8").rstrip("\n\r")
     print("Git commit hash {}".format(git_hash))
   else:
-    response,_ = git_hash_process.communicate()
-    print("Problem getting hash information from git - perhaps this is not a git repo? Please build from a git repo to have complete build information. {}".format(response.decode("UTF-8")))
+    print("Problem getting hash information from git - perhaps this is not a git repo? Please build from a git repo to have complete build information. {}".format(git_hash_response.decode("UTF-8")))
     raise RuntimeError("error getting git hash for build info - not a git repo?")
 
   git_status_process = subprocess.Popen(["git", "status", "-s"],
