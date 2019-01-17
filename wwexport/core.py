@@ -264,7 +264,7 @@ def find_messages_resume_point(space_export_root) -> ResumePoint:
 def get_DM_participant(space: dict, auth_token: str) -> dict:
     global __current_user
     dm_participant = None
-    if "members" in space["members"] and "items" in space["members"]:
+    if "members" in space and "items" in space["members"]:
         if not __current_user:
             __current_user = queries.current_user.execute(auth_token)
         other_participants = [member for member in space["members"]["items"] if member["id"] != __current_user["id"]]
