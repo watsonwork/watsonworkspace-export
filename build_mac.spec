@@ -54,6 +54,7 @@ print("Using build info {}".format(build_info))
 with open("build.txt", "w") as build_file:
     build_file.write(build_info)
 
+
 a = Analysis(['wwexport/__main__.py'],
              binaries=[],
              datas=[
