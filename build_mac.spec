@@ -24,10 +24,14 @@ try:
   git_hash_process = subprocess.Popen(["git", "log", "-1", "--format=%H"],
                                        stdout=subprocess.PIPE,
                                        stderr=subprocess.STDOUT)
-  git_hash,_ = git_hash_process.communicate()
-
-  git_hash = git_hash.decode("UTF-8").rstrip("\n\r")
-  print("Git commit hash {}".format(git_hash))
+  if git_hash_process.returncode is 0:
+    git_hash,_ = git_hash_process.communicate()
+    git_hash = git_hash.decode("UTF-8").rstrip("\n\r")
+    print("Git commit hash {}".format(git_hash))
+  else:
+    response,_ = git_hash_process.communicate()
+    print("Problem getting hash information from git - perhaps this is not a git repo? Please build from a git repo to have complete build information. {}".format(response.decode("UTF-8")))
+    raise RuntimeError("error getting git hash for build info - not a git repo?")
 
   git_status_process = subprocess.Popen(["git", "status", "-s"],
                                        stdout=subprocess.PIPE,
@@ -42,7 +46,7 @@ try:
 
 except FileNotFoundError as e:
   print("FileNotFound on subprocess attempting to get commit info from git - do you have git installed and is this a git repo?")
-  raise e
+  raise RuntimeError("error getting git hash for build info - git not installed?")
 
 print("Using build info {}".format(build_info))
 
@@ -74,7 +78,7 @@ if single_file:
               a.zipfiles,
               a.datas,
               [],
-              name='IBM Watson Workspace Export Utility',
+              name='IBM Watson Workspace Export Utility for Mac',
               debug=False,
               bootloader_ignore_signals=False,
               strip=False,
@@ -91,7 +95,7 @@ else:
               a.scripts,
               [],
               exclude_binaries=True,
-              name='IBM Watson Workspace Export Utility',
+              name='IBM Watson Workspace Export Utility for Mac',
               debug=False,
               bootloader_ignore_signals=False,
               strip=False,
