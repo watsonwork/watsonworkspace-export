@@ -20,10 +20,21 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+from enum import Enum
 from tqdm import tqdm
 from pathlib import Path
 
+
+class OnError(Enum):
+    exit = "EXIT"
+    cont = "CONTINUE"
+
+    def __str__(self):
+        return self.value
+
+
 export_root = Path.home() / "Watson Workspace Export"
+on_graphql_error = OnError.exit
 
 
 def progress_bar(iterable=None, desc=None, position=None, unit="", initial=0):
