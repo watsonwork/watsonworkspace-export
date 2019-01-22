@@ -22,6 +22,7 @@
 
 from wwexport import constants
 from wwexport import auth
+from wwexport import env
 
 import datetime
 import urllib
@@ -86,7 +87,10 @@ class Query:
             if "403" in error_codes:
                 error_codes.remove("403")
             if len(error_codes) > 0:
-                raise GraphQLError(next_level["errors"])
+                if env.on_graphql_error is env.OnError.cont:
+                    logger.error("Set to continue on GraphQL errors, ignoring GraphQL error(s) %s", next_level["errors"])
+                else:
+                    raise GraphQLError(next_level["errors"])
             else:
                 logger.error(
                     "encountered permission denied (403) while fetching data %s", next_level)

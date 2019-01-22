@@ -103,6 +103,8 @@ def main(argv):
 
     parser.add_argument("--annotations", action="store_true", help="Write all annotations in the message files. Even without this option, the content of a generic annotation will be exported if there is no other message content.")
 
+    parser.add_argument("--graphqlerror", type=env.OnError, choices=list(env.OnError), default=env.OnError.exit, help="Determines how certain GraphQL errors are handled. Use with caution as this can cause some errors to be written to the log, but otherwise ignored. Recommended to use this only in conjunction with the spaceid parameter to limit the use to problematic content. This does not affect certain HTML generation and even permission denied errors embedded in GraphQL which will always continue, regardless of this setting. This setting only affects unexpected errors inside GraphQL responses, allowing the program to continue even when the server returns some errors on particular content.")
+
     logging_group = parser.add_argument_group("logging")
     logging_group.add_argument(
         "--loglevel", type=LogLevel, default=LogLevel.info, choices=list(LogLevel), help="Messages of this type will be printed to a {} file in the export directory. Regardless, errors and warnings are ALWAYS printed to a separate {}.".format(debug_file_name, error_file_name))
@@ -142,6 +144,10 @@ def main(argv):
         logger.addHandler(file_log_handler)
 
     logger.info("wwexport - running build %s", build_info)
+
+    # error handling
+    if args.graphqlerror:
+        env.on_graphql_error = args.graphqlerror
 
     # auth
     auth_token = None
@@ -231,7 +237,7 @@ Exporting to {}""".format(env.export_root))
             "Export incomplete. Aborting with HTTP status code %s and reason %s. If problem persists, run with a debug enabled and check the prior request. You may also run the export space by space.", err.status_code, err.reason)
         error = True
     except queries.GraphQLError:
-        logger.exception("Export incomplete. Terminating with GraphQLError. If problem persists, run with a debug enabled and check the prior request. You may also run the export space by space.")
+        logger.exception("Export incomplete. Terminating with GraphQLError. If problem persists, run with a debug enabled and check the prior request. You may also run the export space by space. Consider using the --graphqlerror CONTINUE option if this persists and you are unable to export content.")
         error = True
     except urllib.error.URLError:
         logger.exception("Export incomplete. Problem with the HTTP Connection. Restart the export and it will resume where you left off (for the most part).")
