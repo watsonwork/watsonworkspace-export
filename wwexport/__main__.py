@@ -103,7 +103,7 @@ def main(argv):
 
     parser.add_argument("--annotations", action="store_true", help="Write all annotations in the message files. Even without this option, the content of a generic annotation will be exported if there is no other message content.")
 
-    parser.add_argument("--graphqlerror", type=env.OnError, choices=list(env.OnError), default=env.OnError.exit, help="Determines how certain GraphQL errors are handled. Use with caution as this can cause some errors to be written to the log, but otherwise ignored. Recommended to use this only in conjunction with the spaceid parameter to limit the use to problematic content. This does not affect certain HTML generation and even permission denied errors embedded in GraphQL which which will always continue, regardless of this setting. This setting only affects unexpected errors inside GraphQL responses, allowing the program to continue even when the server returns some errors on particular content.")
+    parser.add_argument("--graphqlerror", type=env.OnError, choices=list(env.OnError), default=env.OnError.exit, help="Determines how certain GraphQL errors are handled. Use with caution as this can cause some errors to be written to the log, but otherwise ignored. Recommended to use this only in conjunction with the spaceid parameter to limit the use to problematic content. This does not affect certain HTML generation and even permission denied errors embedded in GraphQL which will always continue, regardless of this setting. This setting only affects unexpected errors inside GraphQL responses, allowing the program to continue even when the server returns some errors on particular content.")
 
     logging_group = parser.add_argument_group("logging")
     logging_group.add_argument(
