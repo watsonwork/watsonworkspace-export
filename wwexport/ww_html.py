@@ -52,12 +52,6 @@ logger = logging.getLogger("wwexport")
 paths = {}
 
 cleaner = Cleaner(
-    tags=[],
-    strip=False,
-    strip_comments=True
-)
-
-linkifier = Cleaner(
     tags=["a", "br", "code", "em", "img", "p", "pre", "span", "strong"],
     attributes={"a": ["class", "href", "rel"], "img": ["alt", "src"]},
     styles=[],
@@ -151,11 +145,9 @@ def _jinja_filter_md(val: str):
     try:
         # protect WW markdown
         content = CUSTOM_TAG_RE.sub(r"%%WWPLACEHOLDER%%\2%%/WWPLACEHOLDER%%", val)
-        # remove ALL markup
-        content = cleaner.clean(content)
         content = markdownRenderer.reset().convert(content)
-        # ensure only expected tags are output, convert bare URLs to links
-        content = linkifier.clean(content)
+        # ensure only expected tags are output, convert bare URLs (with allowed protocols) to links
+        content = cleaner.clean(content)
     except NameError:
         logger.exception("Problem with markdown conversion - using message as plaintext for some message content")
         content = val

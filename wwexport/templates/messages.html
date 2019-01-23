@@ -44,9 +44,9 @@
           <div class="ic-annotation-border" style="background-color: {{ message.annotationColor }}"></div>
           {% endif %}
           <div class="ic-annotation-content">
-            {% if message.annotationTitle is string %}
+            {% if message.annotationTitle %}
             <div class="ic-annotation-actor">
-              {% if message.annotationActor is string %}
+              {% if message.annotationActor %}
               <span class="ic-annotation-actor-name">{{ message.annotationActor }}</span>
               {% endif %}
               <span class="ic-annotation-title">{{ message.annotationTitle }}</span>
