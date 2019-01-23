@@ -5,7 +5,6 @@ name = "pypi"
 
 [packages]
 python-dateutil = "==2.7.5"
-mistletoe = "==0.7.1"
 tqdm = "==4.29.0"
 bleach = "==3.0.2"
 altgraph = "==0.16.1"
@@ -22,6 +21,7 @@ webencodings = "==0.5.1"
 Babel = "==2.6.0"
 MarkupSafe = "==1.1.0"
 PyInstaller = "==3.4"
+markdown = "==3.0.1"
 
 [dev-packages]
 

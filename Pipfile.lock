@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "45c9c5373e014d610c6ad3e2fd85c2c45995c941fad07dc7b18141e8255bef37"
+            "sha256": "aed0770e9659a22969885a6e151f00985319e0b11f8331e6b840abc0fcae57a2"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -79,6 +79,14 @@
             "index": "pypi",
             "version": "==1.11"
         },
+        "markdown": {
+            "hashes": [
+                "sha256:c00429bd503a47ec88d5e30a751e147dcb4c6889663cd3e2ba0afe858e009baa",
+                "sha256:d02e0f9b04c500cde6637c11ad7c72671f359b87b9fe924b2383649d8841db7c"
+            ],
+            "index": "pypi",
+            "version": "==3.0.1"
+        },
         "markupsafe": {
             "hashes": [
                 "sha256:048ef924c1623740e70204aa7143ec592504045ae4429b59c30054cb31e3c432",
@@ -112,13 +120,6 @@
             ],
             "index": "pypi",
             "version": "==1.1.0"
-        },
-        "mistletoe": {
-            "hashes": [
-                "sha256:5e6cc5879dc835f3ae633e4c649a045fd6d4620d0b43044cfeaae35b1b1c707c"
-            ],
-            "index": "pypi",
-            "version": "==0.7.1"
         },
         "pefile": {
             "hashes": [
