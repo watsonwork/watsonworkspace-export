@@ -40,7 +40,7 @@ from babel.dates import format_date, format_datetime, format_time
 # force pyinstaller to find babel.numbers and include it
 import babel.numbers
 
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 from markdown.extensions import Extension
 from markdown.inlinepatterns import InlineProcessor
 from markdown.inlinepatterns import SimpleTagPattern
@@ -51,7 +51,7 @@ paths = {}
 
 cleaner = Cleaner(
     tags=["a", "br", "code", "em", "img", "p", "pre", "span", "strong"],
-    attributes={"a": ["class", "href", "rel"], "img": ["alt", "src"]},
+    attributes={"a": ["class", "href", "rel"], "code": ["class"], "img": ["alt", "src"]},
     styles=[],
     protocols=["file", "ftp", "ftps", "git", "http", "https", "ibmscp", "ldap", "ldaps", "mailto", "notes", "tel", "watsonworkspace"],
     strip=False,
@@ -61,7 +61,8 @@ cleaner = Cleaner(
 
 jinja_env = Environment(
     # use of the FileSystemLoader is required for PyInstaller packaging
-    loader=FileSystemLoader(searchpath=str(Path(__file__).parent / "templates"))
+    loader=FileSystemLoader(searchpath=str(Path(__file__).parent / "templates")),
+    autoescape=select_autoescape(['html', 'xml'])
 )
 
 

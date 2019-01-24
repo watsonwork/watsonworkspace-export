@@ -53,7 +53,7 @@
             </div>
             {% endif %}
             <div class="ic-message-container">
-              {{ message["content"] | md }}
+              {{ message["content"] | md | safe }}
             </div>
           </div>
         </div>
