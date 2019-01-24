@@ -45,7 +45,6 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from markdown.extensions import Extension
 from markdown.inlinepatterns import InlineProcessor
 from markdown.inlinepatterns import SimpleTagPattern
-from markdown.postprocessors import Postprocessor
 from markdown.util import etree
 
 logger = logging.getLogger("wwexport")
