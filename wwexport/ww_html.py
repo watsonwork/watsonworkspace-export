@@ -30,7 +30,6 @@ import dateutil.parser
 import json
 import logging
 import markdown
-import re
 import sys
 from pathlib import Path
 from functools import partial
@@ -136,7 +135,7 @@ class WWExtension(Extension):
         del md.parser.blockprocessors["ulist"]
 
 
-markdownRenderer = markdown.Markdown(extensions=[WWExtension(), "fenced_code", "nl2br"], output_format="html5")
+markdownRenderer = markdown.Markdown(extensions=[WWExtension(), "markdown.extensions.fenced_code", "markdown.extensions.nl2br"], output_format="html5")
 
 def _jinja_filter_md(val: str):
     content = None
