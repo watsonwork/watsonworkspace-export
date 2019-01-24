@@ -179,7 +179,7 @@ def csv_to_html(file: Path, styles: str = "styles.css"):
         html_file.write(
             template.render(
                 reader=reader,
-                month_year="201811",
+                source_file=file.name,
                 export_date=datetime.datetime.now(),
                 styles=styles,
             )
