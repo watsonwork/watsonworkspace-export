@@ -84,7 +84,7 @@ class FilePattern(InlineProcessor):
             el.set("href", paths[m.group(1)])
         else:
             el.set("href", "")
-            logger.error("Could not resolve link in message to file for file %s", match.group(1))
+            logger.error("Could not resolve link in message to file for file %s", m.group(1))
         return el, m.start(0), m.end(0)
 
 class ImagePattern(InlineProcessor):
@@ -98,7 +98,7 @@ class ImagePattern(InlineProcessor):
             el.set("src", paths[m.group(1)])
         else:
             el.set("src", "")
-            logger.error("Could not resolve link in message to image for image %s", match.group(1))
+            logger.error("Could not resolve link in message to image for image %s", m.group(1))
         return el, m.start(0), m.end(0)
 
 class WWExtension(Extension):
