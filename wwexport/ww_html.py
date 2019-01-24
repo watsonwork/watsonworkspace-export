@@ -41,7 +41,7 @@ from babel.dates import format_date, format_datetime, format_time
 # force pyinstaller to find babel.numbers and include it
 import babel.numbers
 
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+from jinja2 import Environment, FileSystemLoader
 from markdown.extensions import Extension
 from markdown.inlinepatterns import InlineProcessor
 from markdown.inlinepatterns import SimpleTagPattern
@@ -69,11 +69,10 @@ jinja_env = Environment(
 def _jinja_filter_name_case(val: str):
     return val.title() if val is not None and (val.islower() or val.isupper()) else val
 
-CUSTOM_TAG_RE = re.compile(r"(<)((\@|\$file|\$image)(.+?))(>)")
-FILE_RE = r"%%WWPLACEHOLDER%%\$file\|(.*?)(\|(.*?))?%%/WWPLACEHOLDER%%"
-IMAGE_RE = r"%%WWPLACEHOLDER%%\$image\|(.*?)(\|(([0-9]+)x([0-9]+)))?%%/WWPLACEHOLDER%%"
-MENTION_RE = r"%%WWPLACEHOLDER%%@(.+?)\|(.+?)%%/WWPLACEHOLDER%%"
-SPACE_MENTION_RE = r"(%%WWPLACEHOLDER%%)(@space)%%/WWPLACEHOLDER%%"
+FILE_RE = r"<\$file\|(.*?)(\|(.*?))?>"
+IMAGE_RE = r"<\$image\|(.*?)(\|(([0-9]+)x([0-9]+)))?>"
+MENTION_RE = r"<@(.+?)\|(.+?)>"
+SPACE_MENTION_RE = r"(<)(@space)>"
 STRONG_RE = r"(\*)(.+?)\*"
 
 class FilePattern(InlineProcessor):
@@ -142,9 +141,7 @@ markdownRenderer = markdown.Markdown(extensions=[WWExtension(), "fenced_code", "
 def _jinja_filter_md(val: str):
     content = None
     try:
-        # protect WW markdown
-        content = CUSTOM_TAG_RE.sub(r"%%WWPLACEHOLDER%%\2%%/WWPLACEHOLDER%%", val)
-        content = markdownRenderer.reset().convert(content)
+        content = markdownRenderer.reset().convert(val)
         # ensure only expected tags are output, convert bare URLs (with allowed protocols) to links
         content = cleaner.clean(content)
     except NameError:
