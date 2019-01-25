@@ -62,7 +62,10 @@ cleaner = Cleaner(
 jinja_env = Environment(
     # use of the FileSystemLoader is required for PyInstaller packaging
     loader=FileSystemLoader(searchpath=str(Path(__file__).parent / "templates")),
-    autoescape=select_autoescape(['html', 'xml'])
+    autoescape=select_autoescape(['html', 'xml']),
+    extensions=["jinja2.ext.do"],
+    trim_blocks=True,
+    lstrip_blocks=True,
 )
 
 

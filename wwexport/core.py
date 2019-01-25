@@ -237,8 +237,8 @@ def get_messages_path(space_export_root: str, year: int, month: int) -> str:
 
 
 def find_messages_resume_point(space_export_root) -> ResumePoint:
-    for year in range(datetime.datetime.now().year, 2014, -1):
-        for month in range(12, 1, -1):
+    for year in range(datetime.datetime.now().year, 2013, -1):
+        for month in range(12, 0, -1):
             path = get_messages_path(space_export_root, year, month)
             if path.exists():
                 logger.debug("Found possible resume point in %s", path)
@@ -326,6 +326,8 @@ def export_space(space: dict, auth_token: str, export_root_folder: PurePath, fil
         logger.info("Resuming from message ID %s at %sms",
                     last_known_id, next_page_time_in_milliseconds)
         previous_page_ids.add(last_known_id)
+    else:
+        logger.info("Resume point not found")
 
     if file_options != FileOptions.none:
         files_folder_path = space_export_root / "files"
