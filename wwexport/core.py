@@ -232,14 +232,10 @@ def write_message_to_csv(message: str, writer: csv.DictWriter) -> None:
                     annotationTitle, annotationColor])
 
 
-def get_messages_path(space_export_root: str, year: int, month: int) -> str:
-    return space_export_root / constants.MESSAGES_FILE_NAME_PATTERN.format(year=year, month=month)
-
-
 def find_messages_resume_point(space_export_root) -> ResumePoint:
     for year in range(datetime.datetime.now().year, 2014, -1):
         for month in range(12, 1, -1):
-            path = get_messages_path(space_export_root, year, month)
+            path = env.get_messages_path(space_export_root, year, month)
             if path.exists():
                 logger.debug("Found possible resume point in %s", path)
                 with open(path, "r", newline='', encoding=constants.FILE_ENCODING) as space_messages_file:
@@ -398,7 +394,7 @@ def export_space(space: dict, auth_token: str, export_root_folder: PurePath, fil
 
                         # If necessary, tear down the old file and open a new one
                         # for the year and month of the next message
-                        new_messages_path = get_messages_path(
+                        new_messages_path = env.get_messages_path(
                             space_export_root, created_datetime.year, created_datetime.month)
                         if (new_messages_path != current_messages_path):
                             if space_messages_file and not space_messages_file.closed:
