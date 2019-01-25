@@ -82,7 +82,7 @@ class FilePattern(InlineProcessor):
         el.text = m.group(3)
         el.set("class", "ic-file")
         if m.group(1) in paths:
-            el.set("href", paths[m.group(1)])
+            el.set("href", "file://" + paths[m.group(1)])
         else:
             el.set("href", "")
             logger.error("Could not resolve link in message to file for file %s", m.group(1))
@@ -96,7 +96,7 @@ class ImagePattern(InlineProcessor):
         # el.set("width", m.group(4))
         # el.set("height", m.group(5))
         if m.group(1) in paths:
-            el.set("src", paths[m.group(1)])
+            el.set("src", "file://" + paths[m.group(1)])
         else:
             el.set("src", "")
             logger.error("Could not resolve link in message to image for image %s", m.group(1))
