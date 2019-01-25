@@ -6,8 +6,8 @@ future==0.17.1
 idna==2.8
 Jinja2==2.10
 macholib==1.11
+markdown==3.0.1
 MarkupSafe==1.1.0
-mistletoe==0.7.1
 pefile==2018.8.8
 PyInstaller==3.4
 python-dateutil==2.7.5

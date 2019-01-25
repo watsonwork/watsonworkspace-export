@@ -29,100 +29,35 @@ import dateutil
 import dateutil.parser
 import json
 import logging
-import re
+import markdown
 import sys
 from pathlib import Path
 from functools import partial
 
 from bleach.sanitizer import Cleaner
 from bleach.linkifier import LinkifyFilter
-from mistletoe import Document, html_renderer
-from mistletoe.span_token import SpanToken
 from babel.dates import format_date, format_datetime, format_time
 # force pyinstaller to find babel.numbers and include it
 import babel.numbers
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from markdown.extensions import Extension
+from markdown.inlinepatterns import InlineProcessor
+from markdown.inlinepatterns import SimpleTagPattern
+from markdown.util import etree
 
 logger = logging.getLogger("wwexport")
 paths = {}
+
 cleaner = Cleaner(
-    tags=['a', 'code', 'em', 'img', 'p', 'pre', 'span', 'strong'],
-    attributes={'a': ['class', 'href', 'rel'], 'img': ['src']},
+    tags=["a", "br", "code", "em", "img", "p", "pre", "span", "strong"],
+    attributes={"a": ["class", "href", "rel"], "code": ["class"], "img": ["alt", "src"]},
     styles=[],
-    protocols=['file', 'ftp', 'ftps', 'git', 'http', 'https', 'ibmscp', 'ldap', 'ldaps', 'mailto', 'notes', 'tel', 'watsonworkspace'],
+    protocols=["file", "ftp", "ftps", "git", "http", "https", "ibmscp", "ldap", "ldaps", "mailto", "notes", "tel", "watsonworkspace"],
     strip=False,
     strip_comments=True,
-    filters=[partial(LinkifyFilter, skip_tags=['code', 'pre'])]
+    filters=[partial(LinkifyFilter, skip_tags=["code", "pre"])]
 )
-
-class WWMentionSpan(SpanToken):
-    pattern = re.compile(r"\<\@(.+?)\|(.+?)\>")
-
-    def __init__(self, match):
-        self.parse_inner = False
-        self.id = match.group(1)
-        self.display = match.group(2)
-
-class WWSpaceMentionSpan(SpanToken):
-    pattern = re.compile(r"\<(\@space)\>")
-
-    def __init__(self, match):
-        self.parse_inner = False
-        self.display = match.group(1)
-
-class WWFileSpan(SpanToken):
-    pattern = re.compile(r"\<\$file\|(.*?)(\|(.*?))?\>")
-
-    def __init__(self, match):
-        global paths
-        self.parse_inner = False
-        if match.group(1) in paths:
-            self.path = paths[match.group(1)]
-        else:
-            self.path = ""
-            logger.error("Could not resolve link in message to file for file %s", match.group(1))
-        self.name = match.group(3)
-
-class WWImageSpan(SpanToken):
-    pattern = re.compile(r"\<\$image\|(.*?)(\|(([0-9])+x([0-9])+))?\>")
-
-    def __init__(self, match):
-        global paths
-        self.parse_inner = False
-        if match.group(1) in paths:
-            self.path = paths[match.group(1)]
-        else:
-            self.path = ""
-            logger.error("Could not resolve link in message to image for image %s", match.group(1))
-        self.width = match.group(4)
-        self.height = match.group(5)
-
-class WWBoldSpan(SpanToken):
-    pattern = re.compile(r"\*([^*]+)\*")
-
-    def __init__(self, match):
-        self.target = match.group(1)
-
-class WWHTMLRenderer(html_renderer.HTMLRenderer):
-    def __init__(self):
-        super().__init__(WWMentionSpan, WWSpaceMentionSpan, WWFileSpan, WWImageSpan, WWBoldSpan)
-
-    def render_ww_mention_span(self, token):
-        return "<strong>{name}</strong>".format(name=token.display)
-
-    def render_ww_space_mention_span(self, token):
-        return self.render_ww_mention_span(token)
-
-    def render_ww_file_span(self, token):
-        return "<a class=\"ic-file\" href=\"{path}\">{name}</a>".format(name=token.name, path=token.path)
-
-    def render_ww_image_span(self, token):
-        return "<img src=\"{path}\" alt />".format(path=token.path)
-
-    def render_ww_bold_span(self, token):
-        return "<strong>{inner}</strong>".format(inner=self.render_inner(token))
-
 
 jinja_env = Environment(
     # use of the FileSystemLoader is required for PyInstaller packaging
@@ -134,20 +69,89 @@ jinja_env = Environment(
 def _jinja_filter_name_case(val: str):
     return val.title() if val is not None and (val.islower() or val.isupper()) else val
 
+FILE_RE = r"<\$file\|(.*?)(\|(.*?))?>"
+IMAGE_RE = r"<\$image\|(.*?)(\|(([0-9]+)x([0-9]+)))?>"
+MENTION_RE = r"<@(.+?)\|(.+?)>"
+SPACE_MENTION_RE = r"(<)(@space)>"
+STRONG_RE = r"(\*)(.+?)\*"
+
+class FilePattern(InlineProcessor):
+    def handleMatch(self, m, data):
+        global paths
+        el = etree.Element("a")
+        el.text = m.group(3)
+        el.set("class", "ic-file")
+        if m.group(1) in paths:
+            el.set("href", "file://" + paths[m.group(1)])
+        else:
+            el.set("href", "")
+            logger.error("Could not resolve link in message to file for file %s", m.group(1))
+        return el, m.start(0), m.end(0)
+
+class ImagePattern(InlineProcessor):
+    def handleMatch(self, m, data):
+        global paths
+        el = etree.Element("img")
+        el.set("alt", "")
+        # el.set("width", m.group(4))
+        # el.set("height", m.group(5))
+        if m.group(1) in paths:
+            el.set("src", "file://" + paths[m.group(1)])
+        else:
+            el.set("src", "")
+            logger.error("Could not resolve link in message to image for image %s", m.group(1))
+        return el, m.start(0), m.end(0)
+
+class WWExtension(Extension):
+    def extendMarkdown(self, md, md_globals):
+        md.registerExtension(self)
+        md.inlinePatterns["strong"] = SimpleTagPattern(STRONG_RE, "strong")
+
+        md.inlinePatterns.add("file", FilePattern(FILE_RE), ">emphasis2")
+        md.inlinePatterns.add("image", ImagePattern(IMAGE_RE), ">emphasis2")
+        md.inlinePatterns.add("mention", SimpleTagPattern(MENTION_RE, "strong"), ">emphasis2")
+        md.inlinePatterns.add("space_mention", SimpleTagPattern(SPACE_MENTION_RE, "strong"), ">emphasis2")
+
+        del md.preprocessors["html_block"]
+        del md.preprocessors["reference"]
+
+        del md.inlinePatterns["autolink"]
+        del md.inlinePatterns["automail"]
+        del md.inlinePatterns["em_strong"]
+        del md.inlinePatterns["entity"]
+        del md.inlinePatterns["html"]
+        del md.inlinePatterns["image_link"]
+        del md.inlinePatterns["image_reference"]
+        del md.inlinePatterns["reference"]
+        del md.inlinePatterns["short_reference"]
+        del md.inlinePatterns["strong_em"]
+
+        del md.parser.blockprocessors["code"] # `code` is an indented code block, WW only supports 'fenced' code blocks (using ```\nbackticks\n```)
+        del md.parser.blockprocessors["hashheader"]
+        del md.parser.blockprocessors["hr"]
+        del md.parser.blockprocessors["indent"]
+        del md.parser.blockprocessors["olist"]
+        del md.parser.blockprocessors["quote"]
+        del md.parser.blockprocessors["setextheader"]
+        del md.parser.blockprocessors["ulist"]
+
+
+markdownRenderer = markdown.Markdown(extensions=[WWExtension(), "markdown.extensions.fenced_code", "markdown.extensions.nl2br"], output_format="html5")
 
 def _jinja_filter_md(val: str):
-    with WWHTMLRenderer() as renderer:
-        content = None
-        try:
-            content = renderer.render(Document(val))
-        except NameError:
-            logger.exception("Problem with markdown conversion - using message as plaintext for some message content")
-            content = val
-        except ValueError:
-            logger.exception("Problem with markdown conversion - using message as plaintext for some message content")
-            content = val
+    content = None
+    try:
+        content = markdownRenderer.reset().convert(val)
+        # ensure only expected tags are output, convert bare URLs (with allowed protocols) to links
+        content = cleaner.clean(content)
+    except NameError:
+        logger.exception("Problem with markdown conversion - using message as plaintext for some message content")
+        content = val
+    except ValueError:
+        logger.exception("Problem with markdown conversion - using message as plaintext for some message content")
+        content = val
 
-        return cleaner.clean(content)
+    return content
 
 
 jinja_env.filters["format_date"] = format_date
@@ -175,7 +179,7 @@ def csv_to_html(file: Path, styles: str = "styles.css"):
         html_file.write(
             template.render(
                 reader=reader,
-                month_year="201811",
+                source_file=file.name,
                 export_date=datetime.datetime.now(),
                 styles=styles,
             )

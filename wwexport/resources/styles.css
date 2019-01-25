@@ -29,6 +29,10 @@ img {
   margin: 0;
 }
 
+.ic-message-container p:not(:last-child) {
+  margin-bottom: 16px;
+}
+
 .ic-transcript-item {
   color: rgb(29, 54, 73);
   line-height: 24px;
