@@ -28,17 +28,12 @@ from wwexport import ww_html
 from wwexport import env
 from wwexport import messages
 
-import pkgutil
-import hashlib
-import fnmatch
 import urllib
 import sys
 import argparse
 import json
 import logging
-import logging.handlers
 from enum import Enum
-from pathlib import Path
 
 debug_file_name = "debug.log"
 error_file_name = "errors.log"
@@ -53,39 +48,16 @@ class SpaceType(Enum):
         return self.value
 
 
-class LogLevel(Enum):
-    none = "NONE"
-    finest = "FINEST"
-    debug = "DEBUG"
-    info = "INFO"
-    warn = "WARN"
-    error = "ERROR"
-
-    def __str__(self):
-        return self.value
-
-
-def is_message_file(path: Path) -> bool:
-    return fnmatch.fnmatch(path.name, "* messages.csv")
-
-
 def main(argv):
     error = False
     html_gen_errors = []
 
-    try:
-        buildtxt_binary = pkgutil.get_data("wwexport", "build.txt")
-    except FileNotFoundError:
-        build_info = "LOCAL SCRIPT"
-    else:
-        build_info = buildtxt_binary.decode(constants.FILE_ENCODING, "ignore")
-
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        description="Export utility for Watson Workspace, build {}".format(build_info),
+        description="Export utility for Watson Workspace, build {}".format(env.build_info),
         epilog="For example, to export spaces without files, run `python wwexport`. To export spaces with files, run `python wwexport --files=ALL`. To export all spaces and DMs with all files, run `python wwexport --type=ALL --files=ALL`. Always check the {} file in your export directory. Source at https://github.com/watsonwork/watsonworkspace-export".format(error_file_name))
 
-    parser.add_argument("--dir", default=env.export_root, help="Directory to export to. This directory will be created if it doesn't exist.")
+    env.add_export_root_args(parser)
 
     auth_group = parser.add_mutually_exclusive_group()
 
@@ -105,49 +77,19 @@ def main(argv):
 
     parser.add_argument("--graphqlerror", type=env.OnError, choices=list(env.OnError), default=env.OnError.exit, help="Determines how certain GraphQL errors are handled. Use with caution as this can cause some errors to be written to the log, but otherwise ignored. Recommended to use this only in conjunction with the spaceid parameter to limit the use to problematic content. This does not affect certain HTML generation and even permission denied errors embedded in GraphQL which will always continue, regardless of this setting. This setting only affects unexpected errors inside GraphQL responses, allowing the program to continue even when the server returns some errors on particular content.")
 
-    logging_group = parser.add_argument_group("logging")
-    logging_group.add_argument(
-        "--loglevel", type=LogLevel, default=LogLevel.info, choices=list(LogLevel), help="Messages of this type will be printed to a {} file in the export directory. Regardless, errors and warnings are ALWAYS printed to a separate {}.".format(debug_file_name, error_file_name))
+    env.add_logger_args(parser)
 
     args = parser.parse_args()
 
-    env.export_root = Path(args.dir)
-    env.export_root.mkdir(exist_ok=True, parents=True)
-
+    env.config_export_root(args)
+    env.config_logger(args)
     logger = logging.getLogger("wwexport")
-    # set to the the finest level on the top level logger - the actual LogLevel
-    # is controled by the handlers
-    logging.addLevelName(5, "FINEST")
-    logger.setLevel(5)
-    default_formatter = logging.Formatter(
-        "%(asctime)s %(name)s %(levelname)-8s: %(message)s")
-
-    # error log
-    error_log_handler = logging.handlers.RotatingFileHandler(
-        env.export_root / error_file_name,
-        maxBytes=1048576,
-        backupCount=10,
-        encoding=constants.FILE_ENCODING)
-    error_log_handler.setFormatter(default_formatter)
-    error_log_handler.setLevel(logging.WARN)
-    logger.addHandler(error_log_handler)
-
-    # optional debug log
-    if args.loglevel and args.loglevel != LogLevel.none:
-        file_log_handler = logging.handlers.RotatingFileHandler(
-            env.export_root / debug_file_name,
-            maxBytes=1048576,
-            backupCount=10,
-            encoding=constants.FILE_ENCODING)
-        file_log_handler.setFormatter(default_formatter)
-        file_log_handler.setLevel(str(args.loglevel))
-        logger.addHandler(file_log_handler)
-
-    logger.info("wwexport - running build %s", build_info)
 
     # error handling
     if args.graphqlerror:
         env.on_graphql_error = args.graphqlerror
+
+    logger.info("wwexport - running build %s", env.build_info)
 
     # auth
     auth_token = None
@@ -170,17 +112,6 @@ def main(argv):
     logger.info("Starting export")
     print("""
 Exporting to {}""".format(env.export_root))
-
-    # create a local copy of the styles file using a name based on hash
-    # so the HTML and CSS can be updated and an export resumed without breaking
-    # previous exports
-    styles = pkgutil.get_data("wwexport", "resources/styles.css")
-    m = hashlib.md5()
-    m.update(styles)
-    md5 = m.hexdigest()
-    styles_destination = "styles_{}.css".format(md5)
-    with open(env.export_root / styles_destination, "wb") as export_styles:
-        export_styles.write(styles)
 
     try:
         spaces_to_export = []
@@ -213,20 +144,7 @@ Exporting to {}""".format(env.export_root))
                                                                export_annotations=args.annotations,
                                                                space_progress=space_progress)
 
-            # generate HTML
-            for file in env.progress_bar(
-                    filter(is_message_file,
-                           space_root.iterdir()
-                           ),
-                    desc="HTML generation".format(space_display_name),
-                    position=1,
-                    unit=" HTML files",
-                    initial=1):
-                try:
-                    ww_html.csv_to_html(file, styles=styles_destination)
-                except Exception:
-                    html_gen_errors.append(file)
-                    logger.exception("An error occured while generating HTML for %s", file)
+            html_gen_errors.extend(ww_html.space_to_htmls(space_root, space_display_name))
 
     except queries.UnauthorizedRequestError:
         msg = "\nExport incomplete. Looks like your authorization token might have timed out or is invalid. Good thing this is resumable. Get a new token from https://workspace.ibm.com/exporttoken and run this again. We'll pick up from where we left off (more or less)."

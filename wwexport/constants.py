@@ -22,6 +22,9 @@
 
 import datetime
 
+DEBUG_FILE_NAME = "debug.log"
+ERROR_FILE_NAME = "errors.log"
+
 REQUEST_ENCODING = "UTF-8"
 FILE_ENCODING = "UTF-8"
 
