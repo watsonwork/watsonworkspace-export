@@ -322,6 +322,8 @@ def export_space(space: dict, auth_token: str, export_root_folder: PurePath, fil
         logger.info("Resuming from message ID %s at %sms",
                     last_known_id, next_page_time_in_milliseconds)
         previous_page_ids.add(last_known_id)
+    else:
+        logger.info("Resume point not found")
 
     if file_options != FileOptions.none:
         files_folder_path = space_export_root / "files"
