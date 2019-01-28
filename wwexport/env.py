@@ -53,7 +53,7 @@ class OnError(Enum):
 export_root = Path.home() / "Watson Workspace Export"
 on_graphql_error = OnError.exit
 
-__build_info = "LOCAL SCRIPT"
+build_info = "LOCAL SCRIPT"
 
 
 try:

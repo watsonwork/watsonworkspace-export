@@ -233,8 +233,8 @@ def write_message_to_csv(message: str, writer: csv.DictWriter) -> None:
 
 
 def find_messages_resume_point(space_export_root) -> ResumePoint:
-    for year in range(datetime.datetime.now().year, 2014, -1):
-        for month in range(12, 1, -1):
+    for year in range(datetime.datetime.now().year, 2013, -1):
+        for month in range(12, 0, -1):
             path = env.get_messages_path(space_export_root, year, month)
             if path.exists():
                 logger.debug("Found possible resume point in %s", path)

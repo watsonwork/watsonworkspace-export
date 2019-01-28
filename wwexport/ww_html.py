@@ -23,7 +23,6 @@
 from wwexport import constants
 from wwexport import env
 
-import collections
 import argparse
 import csv
 import datetime
@@ -38,6 +37,7 @@ import pkgutil
 import hashlib
 from pathlib import Path
 from functools import partial
+from collections.abc import Iterator
 
 from bleach.sanitizer import Cleaner
 from bleach.linkifier import LinkifyFilter
@@ -187,7 +187,7 @@ def is_message_file(path: Path) -> bool:
     return fnmatch.fnmatch(path.name, "* messages.csv")
 
 
-class MultiFileDictReader(collections.Iterator):
+class MultiFileDictReader(Iterator):
 
     def __init__(self, space_root: str):
         self.space_root = space_root
