@@ -83,17 +83,27 @@ MENTION_RE = r"<@(.+?)\|(.+?)>"
 SPACE_MENTION_RE = r"(<)(@space)>"
 STRONG_RE = r"(\*)(.+?)\*"
 
+def file_path_for_id(id):
+    if id in paths:
+        return "file://" + paths[id]
+    else:
+        try:
+            short_id = id.split("@")[-1]
+            if short_id in paths:
+                return "file://" + paths[short_id]
+        except IndexError:
+            logger.error("Could not resolve link in message to file %s, ID is an unexpected format", id)
+
+        logger.error("Could not resolve link in message to file %s", id)
+        return ""
+
 class FilePattern(InlineProcessor):
     def handleMatch(self, m, data):
         global paths
         el = etree.Element("a")
         el.text = m.group(3)
         el.set("class", "ic-file")
-        if m.group(1) in paths:
-            el.set("href", "file://" + paths[m.group(1)])
-        else:
-            el.set("href", "")
-            logger.error("Could not resolve link in message to file for file %s", m.group(1))
+        el.set("href", file_path_for_id(m.group(1)))
         return el, m.start(0), m.end(0)
 
 class ImagePattern(InlineProcessor):
@@ -103,11 +113,7 @@ class ImagePattern(InlineProcessor):
         el.set("alt", "")
         # el.set("width", m.group(4))
         # el.set("height", m.group(5))
-        if m.group(1) in paths:
-            el.set("src", "file://" + paths[m.group(1)])
-        else:
-            el.set("src", "")
-            logger.error("Could not resolve link in message to image for image %s", m.group(1))
+        el.set("src", file_path_for_id(m.group(1)))
         return el, m.start(0), m.end(0)
 
 class WWExtension(Extension):
@@ -275,6 +281,12 @@ def space_to_single_html(space_root: Path):
     if file_paths_file_path.exists():
         with open(file_paths_file_path, "r", encoding=constants.FILE_ENCODING) as paths_file:
             paths = json.load(paths_file)
+            # Some early file references use a slightly different prefix on the
+            # ID compared to the ID reported by the file service. This change,
+            # together with a change to the lookup code, will address that by
+            # allowing the path to be checked against only the last segment of
+            # the ID
+            paths = {id.split("@")[-1]: path for (id, path) in paths.items()}
 
     with open(space_root / "all messages.html", "w+", encoding=constants.FILE_ENCODING) as html_file:
         reader = MultiFileDictReader(space_root)
@@ -297,6 +309,12 @@ def csv_to_html(file: Path, styles: str = "styles.css"):
     if file_paths_file_path.exists():
         with open(file_paths_file_path, "r", encoding=constants.FILE_ENCODING) as paths_file:
             paths = json.load(paths_file)
+            # Some early file references use a slightly different prefix on the
+            # ID compared to the ID reported by the file service. This change,
+            # together with a change to the lookup code, will address that by
+            # allowing the path to be checked against only the last segment of
+            # the ID
+            paths = {id.split("@")[-1]: path for (id, path) in paths.items()}
 
     with open(file.with_suffix(".html"), "w+", encoding=constants.FILE_ENCODING) as html_file, \
          open(file, "r", encoding=constants.FILE_ENCODING) as csv_file:
