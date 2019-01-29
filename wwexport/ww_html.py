@@ -99,7 +99,6 @@ def file_path_for_id(id):
 
 class FilePattern(InlineProcessor):
     def handleMatch(self, m, data):
-        global paths
         el = etree.Element("a")
         el.text = m.group(3)
         el.set("class", "ic-file")
@@ -108,7 +107,6 @@ class FilePattern(InlineProcessor):
 
 class ImagePattern(InlineProcessor):
     def handleMatch(self, m, data):
-        global paths
         el = etree.Element("img")
         el.set("alt", "")
         # el.set("width", m.group(4))
