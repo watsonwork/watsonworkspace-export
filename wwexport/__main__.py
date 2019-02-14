@@ -55,7 +55,7 @@ def main(argv):
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         description="Export utility for Watson Workspace, build {}".format(env.build_info),
-        epilog="For example, to export all Spaces and DM with files, run `python -m wwexport`. Always check the {} file in your export directory. Source at https://github.com/watsonwork/watsonworkspace-export".format(error_file_name))
+        epilog="For example, to export all Spaces and DM with files, run `python -m wwexport --jwt WATSON_WORK_JWT`, replacing WATSON_WORK_JWT with a value you obtain from https://workspace.ibm.com/exporttoken. Always check the {} file in your export directory. Source at https://github.com/watsonwork/watsonworkspace-export".format(error_file_name))
 
     env.add_export_root_args(parser)
 
