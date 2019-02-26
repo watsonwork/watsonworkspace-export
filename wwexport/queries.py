@@ -246,6 +246,15 @@ dm_spaces = Query("DM Spaces", """query getDMSpaces($after: String) {
     items {
       id
       type
+      created
+      createdBy {
+        id
+      }
+      updated
+      updatedBy {
+        id
+      }
+      membersUpdated
       members(first: 2) {
         items {
           id
@@ -267,6 +276,16 @@ team_spaces = Query("Team Spaces", """query getSpaces($after: String) {
       title
       id
       type
+      created
+      createdBy {
+        id
+      }
+      updated
+      updatedBy {
+        id
+      }
+      description
+      membersUpdated
     }
   }
 }""", ["data", "spaces"])
