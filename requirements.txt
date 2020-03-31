@@ -1,15 +1,16 @@
+-i https://pypi.org/simple/
 altgraph==0.16.1
-Babel==2.6.0
-bleach==3.0.2
+babel==2.6.0
+bleach==3.1.4
 certifi==2018.11.29
 future==0.17.1
 idna==2.8
-Jinja2==2.10
+jinja2==2.10
 macholib==1.11
 markdown==3.0.1
-MarkupSafe==1.1.0
+markupsafe==1.1.0
 pefile==2018.8.8
-PyInstaller==3.4
+pyinstaller==3.4
 python-dateutil==2.7.5
 pytz==2018.7
 six==1.12.0
