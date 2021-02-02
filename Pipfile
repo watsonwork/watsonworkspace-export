@@ -6,7 +6,7 @@ name = "pypi"
 [packages]
 python-dateutil = "==2.7.5"
 tqdm = "==4.29.0"
-bleach = "==3.0.2"
+bleach = "==3.3.0"
 altgraph = "==0.16.1"
 certifi = "==2018.11.29"
 future = "==0.17.1"
